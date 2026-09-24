@@ -3,7 +3,8 @@ export function appOrigin() {
 }
 
 export function submitUrlFor(slug: string) {
-  return `${appOrigin()}/api/submit/${slug}`;
+  const apiOrigin = (process.env.FORM_API_ORIGIN ?? "https://api.formsquid.com").replace(/\/$/, "");
+  return `${apiOrigin}/forms/${slug}/submissions`;
 }
 
 export function hostedHost(slug: string) {

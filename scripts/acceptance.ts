@@ -153,7 +153,7 @@ async function publishForm(page: Page, origin: string) {
   await page.getByText("Published", { exact: true }).waitFor();
 }
 
-async function installRegistry(origin: string, registryKey: string, consumerDir: string) {
+async function installRegistry(origin: string, registryKey: string, consumerDir: string, submitUrl: string) {
   const registryUrl = `${origin}/r/${registryKey}.json`;
   const response = await fetch(registryUrl);
   if (!response.ok) {
@@ -172,8 +172,8 @@ async function installRegistry(origin: string, registryKey: string, consumerDir:
     await writeFile(path.join(installDir, file.path), file.content);
   }
   const formSource = await readFile(path.join(installDir, "form.tsx"), "utf8");
-  if (!formSource.includes(`${origin}/api/submit/${slug}`)) {
-    throw new Error("Installed form does not submit to the FormSquid origin.");
+  if (!formSource.includes(submitUrl)) {
+    throw new Error(`Installed form does not submit to ${submitUrl}.`);
   }
   await writeFile(
     path.join(consumerDir, "app", "page.tsx"),
@@ -228,6 +228,36 @@ async function cleanup() {
   }
 }
 
+async function deployFunction() {
+  console.log(`Deploying API function on ${branchName}`);
+  await run("neon", [
+    "functions",
+    "deploy",
+    "api",
+    "--src",
+    "functions/api.ts",
+    "--branch",
+    branchName,
+    "--project-id",
+    projectId,
+  ]);
+  const details = await run("neon", [
+    "functions",
+    "get",
+    "api",
+    "--branch",
+    branchName,
+    "--project-id",
+    projectId,
+  ]);
+  const url = details.match(/https:\/\/\S+/)?.[0]?.replace(/\/$/, "");
+  if (!url) {
+    throw new Error(`Neon did not return a function URL.\n${details}`);
+  }
+  await waitForOk(`${url}/health`);
+  return url;
+}
+
 async function main() {
   console.log(`Creating disposable branch ${branchName}`);
   await run("neon", ["branches", "create", "--name", branchName, "--project-id", projectId, "--no-secrets", "--schema-only"]);
@@ -239,6 +269,7 @@ async function main() {
     await run("psql", [direct, "-v", "ON_ERROR_STOP=1", "-f", path.join(root, "db/migrations/0000_silly_dreadnoughts.sql")]);
   }
 
+  const functionOrigin = await deployFunction();
   const formsquidPort = await freePort();
   const consumerPort = await freePort();
   const formsquidOrigin = `http://127.0.0.1:${formsquidPort}`;
@@ -254,6 +285,7 @@ async function main() {
     BETTER_AUTH_URL: formsquidOrigin,
     NEXT_PUBLIC_APP_ORIGIN: formsquidOrigin,
     NEXT_PUBLIC_ROOT_DOMAIN: "formsquid.test",
+    FORM_API_ORIGIN: functionOrigin,
     NEXT_DIST_DIR: ".next-acceptance",
   }, root);
   await waitForOk(`${formsquidOrigin}/sign-up`);
@@ -282,7 +314,8 @@ async function main() {
   await cp(path.join(root, "components", "ui"), path.join(consumerDir, "components", "ui"), { recursive: true });
   await mkdir(path.join(consumerDir, "lib"), { recursive: true });
   await cp(path.join(root, "lib", "utils.ts"), path.join(consumerDir, "lib", "utils.ts"));
-  const registryUrl = await installRegistry(formsquidOrigin, registryKey, consumerDir);
+  const submitUrl = `${functionOrigin}/forms/${slug}/submissions`;
+  const registryUrl = await installRegistry(formsquidOrigin, registryKey, consumerDir, submitUrl);
   console.log(`Installed ${registryUrl}`);
 
   start(
