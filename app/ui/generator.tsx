@@ -1,0 +1,78 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { generateAction } from "@/app/lib/actions/generate";
+import { pendingSpecKey, type FormSpec } from "@/app/lib/definitions";
+import { FormView } from "@/app/ui/form-view";
+
+export function Generator() {
+  const router = useRouter();
+  const [prompt, setPrompt] = useState("Create a client intake form for a web design agency. Ask about budget, current website, timeline, and project goals.");
+  const [spec, setSpec] = useState<FormSpec | null>(null);
+  const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
+
+  async function handleGenerate() {
+    setPending(true);
+    setError("");
+    const result = await generateAction(prompt);
+    setPending(false);
+    if (result.error || !result.spec) {
+      setError(result.error ?? "Could not generate that form.");
+      return;
+    }
+    setSpec(result.spec);
+    window.localStorage.setItem(pendingSpecKey, JSON.stringify(result.spec));
+  }
+
+  function handleSave() {
+    if (!spec) {
+      return;
+    }
+    window.localStorage.setItem(pendingSpecKey, JSON.stringify(spec));
+    router.push("/sign-up");
+  }
+
+  return (
+    <div className="mx-auto w-full max-w-xl space-y-4">
+      <div className="rounded-[2rem] bg-foreground/5 p-1.5">
+        <div className="rounded-[calc(2rem-0.375rem)] bg-card p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+          <Textarea
+            aria-label="What form do you need?"
+            className="min-h-36 resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+          />
+          <div className="pt-2">
+            <Button
+              type="button"
+              className="h-11 w-full rounded-full transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-[0.98]"
+              onClick={() => void handleGenerate()}
+              disabled={pending}
+            >
+              {pending ? "Generating" : "Generate"}
+            </Button>
+          </div>
+        </div>
+      </div>
+      {error ? <p className="text-center text-sm text-destructive">{error}</p> : null}
+      <div className="rounded-[2rem] bg-foreground/5 p-1.5">
+        <div className="rounded-[calc(2rem-0.375rem)] bg-card p-6">
+          {spec ? (
+            <div className="space-y-6">
+              <FormView spec={spec} preview />
+              <Button type="button" variant="outline" className="h-11 w-full rounded-full" onClick={handleSave}>
+                Save and publish
+              </Button>
+            </div>
+          ) : (
+            <p className="py-10 text-center text-muted-foreground">The form preview shows up here.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
