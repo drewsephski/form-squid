@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function HostedFormPage({ params }: PageProps<"/f/[slug]">) {
+export default async function HostedFormPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const form = await getPublishedForm(slug);
   if (!form) {

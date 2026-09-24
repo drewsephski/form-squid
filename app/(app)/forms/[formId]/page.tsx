@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { getForm } from "@/app/lib/actions/forms-read";
 import { Editor } from "@/app/ui/editor";
 
-export default async function FormPage({ params }: PageProps<"/forms/[formId]">) {
+export default async function FormPage({ params }: { params: Promise<{ formId: string }> }) {
   const { formId } = await params;
   const form = await getForm(formId).catch(() => null);
   if (!form) {
