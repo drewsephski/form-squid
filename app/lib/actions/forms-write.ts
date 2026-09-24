@@ -1,11 +1,12 @@
 "use server";
 
-import { and, desc, eq, ne } from "drizzle-orm";
+import { and, desc, eq, ne, sql } from "drizzle-orm";
 import { randomBytes, randomUUID } from "node:crypto";
 import { db } from "@/db";
 import { formVersions, forms } from "@/db/schema";
 import { formSpecSchema, type FormSpec } from "@/app/lib/definitions";
 import { requireFormOwner, requireUser } from "@/app/lib/auth-guards";
+import { assertPublicSlug, reservedSlugs } from "@/app/lib/reserved-slugs";
 
 function slugify(title: string) {
   const base = title
@@ -18,8 +19,11 @@ function slugify(title: string) {
 
 async function uniqueSlug(title: string, currentId?: string) {
   const base = slugify(title);
-  for (let index = 0; index < 20; index += 1) {
+  for (let index = 0; index < 40; index += 1) {
     const slug = index === 0 ? base : `${base}-${index + 1}`;
+    if (reservedSlugs.has(slug)) {
+      continue;
+    }
     const existing = await db.select({ id: forms.id }).from(forms).where(eq(forms.slug, slug));
     if (!existing[0] || existing[0].id === currentId) {
       return slug;
@@ -46,10 +50,7 @@ export async function updateDraft(formId: string, input: unknown, slug: string) 
   const user = await requireUser();
   await requireFormOwner(formId, user.id);
   const spec = formSpecSchema.parse(input);
-  const nextSlug = slug.trim().toLowerCase();
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(nextSlug)) {
-    throw new Error("Use a lowercase slug.");
-  }
+  const nextSlug = assertPublicSlug(slug);
   const taken = await db
     .select({ id: forms.id })
     .from(forms)
@@ -62,25 +63,39 @@ export async function updateDraft(formId: string, input: unknown, slug: string) 
 
 export async function publishForm(formId: string, input: unknown, slug: string) {
   const user = await requireUser();
-  await updateDraft(formId, input, slug);
+  await requireFormOwner(formId, user.id);
   const spec = formSpecSchema.parse(input);
-  const versions = await db
-    .select({ versionNumber: formVersions.versionNumber })
-    .from(formVersions)
-    .where(eq(formVersions.formId, formId))
-    .orderBy(desc(formVersions.versionNumber));
+  const nextSlug = assertPublicSlug(slug);
   const versionId = randomUUID();
-  const versionNumber = (versions[0]?.versionNumber ?? 0) + 1;
-  await db.insert(formVersions).values({
-    id: versionId,
-    formId,
-    versionNumber,
-    spec,
+
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`select id from forms where id = ${formId} for update`);
+    const taken = await tx
+      .select({ id: forms.id })
+      .from(forms)
+      .where(and(eq(forms.slug, nextSlug), ne(forms.id, formId)));
+    if (taken[0]) {
+      throw new Error("That address is already taken.");
+    }
+    const versions = await tx
+      .select({ versionNumber: formVersions.versionNumber })
+      .from(formVersions)
+      .where(eq(formVersions.formId, formId))
+      .orderBy(desc(formVersions.versionNumber));
+    const versionNumber = (versions[0]?.versionNumber ?? 0) + 1;
+    await tx.update(forms).set({ draftSpec: spec, slug: nextSlug, updatedAt: new Date() }).where(eq(forms.id, formId));
+    await tx.insert(formVersions).values({
+      id: versionId,
+      formId,
+      versionNumber,
+      spec,
+    });
+    await tx
+      .update(forms)
+      .set({ currentPublishedVersionId: versionId, updatedAt: new Date() })
+      .where(eq(forms.id, formId));
   });
-  await db
-    .update(forms)
-    .set({ currentPublishedVersionId: versionId, updatedAt: new Date() })
-    .where(eq(forms.id, formId));
+
   return { versionId };
 }
 

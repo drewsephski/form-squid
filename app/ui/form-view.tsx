@@ -9,6 +9,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { honeypotField, type FormField, type FormSpec, type SubmissionData } from "@/app/lib/definitions";
+import { parseNumberInput } from "@/app/lib/number-input";
 import { fieldIsVisible } from "@/app/lib/submission-algorithm";
 import { validateSubmission } from "@/app/lib/validate-submission";
 
@@ -25,14 +26,22 @@ export function FormView({ spec, submitUrl, preview = false }: FormViewProps) {
   const [honeypot, setHoneypot] = useState("");
   const [done, setDone] = useState(false);
   const [pending, setPending] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const step = spec.steps[stepIndex];
 
   if (!step) {
     return null;
   }
 
-  function handleValue(id: string, value: string | number | boolean) {
-    setValues((current) => ({ ...current, [id]: value }));
+  function handleValue(id: string, value: string | number | boolean | undefined) {
+    setValues((current) => {
+      if (value === undefined) {
+        const next = { ...current };
+        delete next[id];
+        return next;
+      }
+      return { ...current, [id]: value };
+    });
   }
 
   function visible(field: FormField) {
@@ -64,14 +73,23 @@ export function FormView({ spec, submitUrl, preview = false }: FormViewProps) {
       return;
     }
     setPending(true);
-    const response = await fetch(submitUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...result.data, [honeypotField]: honeypot }),
-    });
-    setPending(false);
-    if (response.ok) {
-      setDone(true);
+    setSubmitError("");
+    try {
+      const response = await fetch(submitUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...result.data, [honeypotField]: honeypot }),
+      });
+      if (response.ok) {
+        setDone(true);
+        return;
+      }
+      const body = (await response.json().catch(() => null)) as { error?: unknown } | null;
+      setSubmitError(typeof body?.error === "string" ? body.error : "Could not submit. Try again.");
+    } catch {
+      setSubmitError("Could not submit. Try again.");
+    } finally {
+      setPending(false);
     }
   }
 
@@ -123,6 +141,7 @@ export function FormView({ spec, submitUrl, preview = false }: FormViewProps) {
           {stepIndex < spec.steps.length - 1 ? "Next" : spec.submitLabel}
         </Button>
       </div>
+      {submitError ? <p role="alert" className="text-sm text-destructive">{submitError}</p> : null}
     </form>
   );
 }
@@ -131,7 +150,7 @@ interface FieldControlProps {
   field: FormField;
   value: SubmissionData[string] | undefined;
   error?: string;
-  onChange: (value: string | number | boolean) => void;
+  onChange: (value: string | number | boolean | undefined) => void;
 }
 
 function FieldControl({ field, value, error, onChange }: FieldControlProps) {
@@ -174,9 +193,9 @@ function FieldControl({ field, value, error, onChange }: FieldControlProps) {
           id={id}
           type={field.type === "text" ? "text" : field.type}
           placeholder={field.placeholder}
-          value={value === undefined ? "" : String(value)}
+          value={typeof value === "number" ? (Number.isFinite(value) ? value : "") : value === undefined ? "" : String(value)}
           aria-invalid={Boolean(error)}
-          onChange={(event) => onChange(field.type === "number" ? event.target.valueAsNumber : event.target.value)}
+          onChange={(event) => onChange(field.type === "number" ? parseNumberInput(event.target.value) : event.target.value)}
         />
       ) : null}
       {field.description ? <p className="text-sm text-muted-foreground">{field.description}</p> : null}

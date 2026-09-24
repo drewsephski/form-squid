@@ -17,19 +17,9 @@ export const fieldTypes = [
 
 export type FieldType = (typeof fieldTypes)[number];
 
-const plainText = (max: number) =>
-  z
-    .string()
-    .trim()
-    .min(1)
-    .max(max)
-    .refine((value) => !/[<>]/.test(value), "Plain text only.");
+const plainText = (max: number) => z.string().trim().min(1).max(max);
 
-const optionalPlainText = (max: number) =>
-  z
-    .string()
-    .max(max)
-    .refine((value) => !/[<>]/.test(value), "Plain text only.");
+const optionalPlainText = (max: number) => z.string().max(max);
 
 export const optionSchema = z.object({
   value: plainText(200),

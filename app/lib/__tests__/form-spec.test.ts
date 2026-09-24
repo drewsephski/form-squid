@@ -1,6 +1,9 @@
 import { describe, expect, test } from "@jest/globals";
 import ts from "typescript";
 import { compileForm } from "../compiler";
+import { formHostSlug } from "../form-host";
+import { parseNumberInput } from "../number-input";
+import { reservedSlugs } from "../reserved-slugs";
 import { formSpecSchema, type FormSpec } from "../definitions";
 import { normalizeFormSpec } from "../normalize-form-spec";
 import { validateSubmission } from "../validate-submission";
@@ -154,10 +157,10 @@ function loadSchema(source: string) {
     },
     fileName: "schema.ts",
   });
-  const module = { exports: {} as Record<string, unknown> };
+  const compiledModule = { exports: {} as Record<string, unknown> };
   const run = new Function("exports", "require", "module", output.outputText);
-  run(module.exports, require, module);
-  return module.exports as {
+  run(compiledModule.exports, require, compiledModule);
+  return compiledModule.exports as {
     submissionSchema: {
       safeParse: (input: unknown) => {
         success: boolean;
@@ -225,22 +228,21 @@ describe("form spec", () => {
     ).toThrow(/earlier field/);
   });
 
-  test("rejects markup in labels", () => {
-    expect(() =>
-      spec({
-        schemaVersion: 1,
-        title: "Bad",
-        submitLabel: "Send",
-        successMessage: "Ok",
-        steps: [
-          {
-            id: "main",
-            title: "Main",
-            fields: [{ id: "name", type: "text", label: "<script>", required: true }],
-          },
-        ],
-      }),
-    ).toThrow(/Plain text/);
+  test("allows comparison punctuation in labels", () => {
+    const form = spec({
+      schemaVersion: 1,
+      title: "Budget < $5,000",
+      submitLabel: "Send",
+      successMessage: "Ok",
+      steps: [
+        {
+          id: "main",
+          title: "Employees > 50",
+          fields: [{ id: "name", type: "text", label: "Budget < $5,000", required: true }],
+        },
+      ],
+    });
+    expect(form.title).toBe("Budget < $5,000");
   });
 
   test("normalizes nullable AI output into the canonical spec", () => {
@@ -315,8 +317,38 @@ describe("validateSubmission", () => {
     expect(result).toEqual({ ok: true, data: { owns: "no" } });
   });
 
+  test("treats a cleared optional number as absent", () => {
+    const form = spec({
+      schemaVersion: 1,
+      title: "Budget",
+      submitLabel: "Send",
+      successMessage: "Ok",
+      steps: [
+        {
+          id: "main",
+          title: "Main",
+          fields: [{ id: "budget", type: "number", label: "Budget", required: false }],
+        },
+      ],
+    });
+    expect(parseNumberInput("")).toBeUndefined();
+    expect(parseNumberInput("123")).toBe(123);
+    expect(validateSubmission(form, {}).ok).toBe(true);
+    expect(validateSubmission(form, { budget: Number.NaN }).ok).toBe(false);
+  });
+
   test("rejects unknown keys", () => {
     expect(validateSubmission(contact, { name: "Ada", email: "ada@work.com", extra: "no" }).ok).toBe(false);
+  });
+});
+
+describe("form hosts", () => {
+  test("serves a form slug and blocks reserved or nested hosts", () => {
+    expect(formHostSlug("client.formsquid.com", "formsquid.com")).toBe("client");
+    expect(formHostSlug("api.formsquid.com", "formsquid.com")).toBeNull();
+    expect(formHostSlug("formsquid.com", "formsquid.com")).toBeNull();
+    expect(formHostSlug("a.b.formsquid.com", "formsquid.com")).toBeNull();
+    expect(reservedSlugs.has("api")).toBe(true);
   });
 });
 
@@ -346,6 +378,15 @@ describe("compiler", () => {
     expect(compiled.formSource).toContain(JSON.stringify('"); alert("xss'));
     expect(compiled.formSource).toContain(JSON.stringify("back`tick\nnewline"));
     expect(compiled.schemaSource).toContain(JSON.stringify('"); alert("xss'));
+  });
+
+  test("subscribes exported conditions with useWatch and clears empty numbers", () => {
+    const source = compileForm(conditional, submitUrl).formSource;
+    expect(source).toContain("useWatch");
+    expect(source).toContain("conditionMet(spec, watched ?? {}, field)");
+    expect(source).not.toContain("conditionMet(spec, form.getValues()");
+    expect(source).toContain("parseNumberInput");
+    expect(source).not.toContain("valueAsNumber");
   });
 
   test("matches the runtime validator for the fixture payloads", () => {

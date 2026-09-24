@@ -36,7 +36,7 @@ export function AuthForm({ mode }: AuthFormProps) {
 
     const pendingSpec = window.localStorage.getItem(pendingSpecKey);
     if (!pendingSpec) {
-      router.push("/");
+      router.push("/forms");
       return;
     }
 

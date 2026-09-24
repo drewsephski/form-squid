@@ -55,7 +55,10 @@ export const submissions = pgTable(
     payload: jsonb("payload").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [index("submissions_form_id_idx").on(table.formId)],
+  (table) => [
+    index("submissions_form_id_idx").on(table.formId),
+    index("submissions_form_created_idx").on(table.formId, table.createdAt),
+  ],
 );
 
 export const generationEvents = pgTable(

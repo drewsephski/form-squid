@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { generateAction } from "@/app/lib/actions/generate";
+import { exportSubmissionsCsv, loadSubmissions } from "@/app/lib/actions/forms-read";
 import { publishForm, restoreVersion, updateDraft, updateNotifyEmail } from "@/app/lib/actions/forms-write";
 import { deleteSubmission } from "@/app/lib/actions/submissions-write";
 import { compileAction } from "@/app/lib/actions/compile";
@@ -25,6 +26,7 @@ interface EditorForm {
   publishedVersionId: string | null;
   versions: Array<{ id: string; versionNumber: number; createdAt: string }>;
   submissions: Array<{ id: string; formVersionId: string; payload: unknown; createdAt: string }>;
+  nextCursor: string | null;
 }
 
 export function Editor({ form }: { form: EditorForm }) {
@@ -35,9 +37,18 @@ export function Editor({ form }: { form: EditorForm }) {
   const [instruction, setInstruction] = useState("");
   const [candidate, setCandidate] = useState<FormSpec | null>(null);
   const [selectedId, setSelectedId] = useState(form.submissions[0]?.id ?? "");
+  const [extraSubmissions, setExtraSubmissions] = useState<EditorForm["submissions"]>([]);
+  const [nextCursor, setNextCursor] = useState(form.nextCursor);
+  const [submissionSource, setSubmissionSource] = useState(form.submissions);
+  if (submissionSource !== form.submissions) {
+    setSubmissionSource(form.submissions);
+    setExtraSubmissions([]);
+    setNextCursor(form.nextCursor);
+  }
   const [pending, setPending] = useState(false);
   const [compiled, setCompiled] = useState<{ schemaSource: string; formSource: string } | null>(null);
-  const selected = form.submissions.find((row) => row.id === selectedId) ?? form.submissions[0];
+  const submissions = [...form.submissions, ...extraSubmissions];
+  const selected = submissions.find((row) => row.id === selectedId) ?? submissions[0];
 
   function updateField(fieldId: string, patch: Partial<FormField>) {
     setSpec((current) => ({
@@ -199,7 +210,7 @@ export function Editor({ form }: { form: EditorForm }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {form.submissions.map((row) => (
+                  {submissions.map((row) => (
                     <tr key={row.id} className="border-b">
                       <td className="py-2">
                         <button type="button" className="underline" onClick={() => setSelectedId(row.id)}>{new Date(row.createdAt).toLocaleString()}</button>
@@ -209,6 +220,21 @@ export function Editor({ form }: { form: EditorForm }) {
                   ))}
                 </tbody>
               </table>
+              {nextCursor ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-3"
+                  onClick={() => {
+                    void loadSubmissions(form.id, nextCursor).then((page) => {
+                      setExtraSubmissions((current) => [...current, ...page.submissions]);
+                      setNextCursor(page.nextCursor);
+                    });
+                  }}
+                >
+                  Load more
+                </Button>
+              ) : null}
             </div>
             {selected ? (
               <div className="space-y-3">
@@ -217,15 +243,15 @@ export function Editor({ form }: { form: EditorForm }) {
                   type="button"
                   variant="outline"
                   onClick={() => {
-                    const header = Object.keys(selected.payload as Record<string, unknown>);
-                    const body = form.submissions.map((row) => header.map((key) => JSON.stringify((row.payload as Record<string, unknown>)[key] ?? "")).join(",")).join("\n");
-                    const blob = new Blob([[header.join(","), body].join("\n")], { type: "text/csv" });
-                    const url = URL.createObjectURL(blob);
-                    const link = document.createElement("a");
-                    link.href = url;
-                    link.download = `${slug}.csv`;
-                    link.click();
-                    URL.revokeObjectURL(url);
+                    void exportSubmissionsCsv(form.id).then((csv) => {
+                      const blob = new Blob([csv], { type: "text/csv" });
+                      const url = URL.createObjectURL(blob);
+                      const link = document.createElement("a");
+                      link.href = url;
+                      link.download = `${slug}.csv`;
+                      link.click();
+                      URL.revokeObjectURL(url);
+                    }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not export submissions."));
                   }}
                 >
                   Download CSV

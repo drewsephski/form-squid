@@ -37,7 +37,8 @@ function schemaSource(spec: FormSpec): string {
     .map((step) => `  [${JSON.stringify(step.id)}]: createSchema(${JSON.stringify(step.id)})`)
     .join(",\n");
 
-  return `import { z } from "zod";
+  return `// @ts-nocheck
+import { z } from "zod";
 
 const spec = ${specLiteral};
 
@@ -73,7 +74,7 @@ function formSource(spec: FormSpec, submitUrl: string): string {
   return `"use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -92,24 +93,53 @@ import {
 } from "@/components/ui/form";
 import { stepSchemas, submissionSchema } from "./schema";
 
-const spec = ${JSON.stringify(spec, null, 2)};
+const spec = ${JSON.stringify(spec, null, 2)} as {
+  title: string;
+  description?: string;
+  submitLabel: string;
+  successMessage: string;
+  steps: Array<{
+    id: string;
+    title: string;
+    fields: Array<{
+      id: string;
+      type: string;
+      label: string;
+      description?: string;
+      placeholder?: string;
+      required: boolean;
+      options?: Array<{ value: string; label: string }>;
+      visibleWhen?: { fieldId: string; equals: string };
+    }>;
+  }>;
+};
 const submitUrl = ${JSON.stringify(submitUrl)};
+
+function parseNumberInput(raw: string): number | undefined {
+  if (raw === "") {
+    return undefined;
+  }
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : undefined;
+}
 
 export function ExportedForm() {
   const [stepIndex, setStepIndex] = useState(0);
   const [done, setDone] = useState(false);
   const [honeypot, setHoneypot] = useState("");
+  const [submitError, setSubmitError] = useState("");
   const form = useForm({
     resolver: zodResolver(submissionSchema),
     defaultValues: {},
   });
+  const watched = useWatch({ control: form.control });
   const step = spec.steps[stepIndex];
   if (!step) {
     return null;
   }
 
   function handleNext() {
-    const parsed = stepSchemas[step.id].safeParse(form.getValues());
+    const parsed = stepSchemas[step.id as keyof typeof stepSchemas].safeParse(form.getValues());
     if (!parsed.success) {
       for (const issue of parsed.error.issues) {
         const name = String(issue.path[0] ?? step.id);
@@ -117,21 +147,30 @@ export function ExportedForm() {
       }
       return;
     }
-    setStepIndex((current) => current + 1);
+    setStepIndex((current: number) => current + 1);
   }
 
   async function handleSubmit(values: unknown) {
+    setSubmitError("");
     if (honeypot) {
       setDone(true);
       return;
     }
-    const response = await fetch(submitUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...((values as Record<string, unknown>) ?? {}), _gotcha: honeypot }),
-    });
-    if (response.ok) {
-      setDone(true);
+    try {
+      const response = await fetch(submitUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...((values as Record<string, unknown>) ?? {}), _gotcha: honeypot }),
+      });
+      if (response.ok) {
+        setDone(true);
+        return;
+      }
+      const body = await response.json().catch(() => null);
+      const message = body && typeof body === "object" && "error" in body && typeof body.error === "string" ? body.error : "Could not submit. Try again.";
+      setSubmitError(message);
+    } catch {
+      setSubmitError("Could not submit. Try again.");
     }
   }
 
@@ -148,7 +187,7 @@ export function ExportedForm() {
         </div>
         <h2 className="text-lg font-medium">{step.title}</h2>
         {step.fields.map((field) => {
-          if (field.visibleWhen && !conditionMet(spec, form.getValues(), field)) {
+          if (field.visibleWhen && !conditionMet(spec, watched ?? {}, field)) {
             return null;
           }
           return (
@@ -177,7 +216,7 @@ export function ExportedForm() {
         />
         <div className="flex gap-2">
           {stepIndex > 0 ? (
-            <Button type="button" variant="outline" onClick={() => setStepIndex((current) => current - 1)}>
+            <Button type="button" variant="outline" onClick={() => setStepIndex((current: number) => current - 1)}>
               Back
             </Button>
           ) : null}
@@ -189,6 +228,7 @@ export function ExportedForm() {
             <Button type="submit">{spec.submitLabel}</Button>
           )}
         </div>
+        {submitError ? <p role="alert">{submitError}</p> : null}
       </form>
     </Form>
   );
@@ -252,9 +292,9 @@ function renderControl(field: (typeof spec.steps)[number]["fields"][number], con
     <Input
       type={field.type === "number" ? "number" : field.type === "date" ? "date" : field.type === "email" ? "email" : "text"}
       placeholder={field.placeholder}
-      value={field.type === "number" ? (control.value as number | undefined) ?? "" : String(control.value ?? "")}
+      value={field.type === "number" ? (typeof control.value === "number" && Number.isFinite(control.value) ? control.value : "") : String(control.value ?? "")}
       onChange={(event) =>
-        control.onChange(field.type === "number" ? event.target.valueAsNumber : event.target.value)
+        control.onChange(field.type === "number" ? parseNumberInput(event.target.value) : event.target.value)
       }
     />
   );

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
-import { SiteFooter, SiteHeader } from "@/app/ui/site-chrome";
 import "./globals.css";
 
 const fraunces = Fraunces({
@@ -31,9 +30,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${fraunces.variable} ${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
     >
       <body className="flex min-h-dvh flex-col bg-background font-sans text-foreground">
-        <SiteHeader />
         <div className="flex flex-1 flex-col">{children}</div>
-        <SiteFooter />
         <Toaster />
       </body>
     </html>
