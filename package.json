@@ -9,6 +9,7 @@
     "lint": "eslint",
     "check-types": "tsc --noEmit",
     "test": "jest",
+    "test:acceptance": "node --experimental-strip-types scripts/acceptance.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "check": "pnpm lint && pnpm check-types && pnpm test && pnpm build"
@@ -48,6 +49,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
     "jest": "^30.5.2",
+    "playwright": "^1.63.0",
     "tailwindcss": "^4",
     "ts-jest": "^29.4.13",
     "typescript": "^5"

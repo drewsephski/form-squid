@@ -203,5 +203,5 @@ export function validatePayload(
     return { ok: false, errors };
   }
 
-  return { ok: true, data: normalized };
+  return { ok: true, data: { ...normalized } };
 }

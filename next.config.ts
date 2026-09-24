@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  distDir: process.env.NEXT_DIST_DIR ?? ".next",
+  ...(process.env.NEXT_DIST_DIR
+    ? { typescript: { tsconfigPath: "tsconfig.acceptance.json" } }
+    : {}),
 };
 
 export default nextConfig;

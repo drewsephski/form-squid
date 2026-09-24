@@ -1,0 +1,7 @@
+{
+  "name": "formsquid-acceptance-consumer",
+  "private": true,
+  "scripts": {
+    "dev": "next dev"
+  }
+}

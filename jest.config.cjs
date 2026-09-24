@@ -2,6 +2,7 @@
 const config = {
   testEnvironment: "node",
   testMatch: ["**/__tests__/**/*.test.ts"],
+  modulePathIgnorePatterns: ["<rootDir>/.tmp"],
   transform: {
     "^.+\\.tsx?$": [
       "ts-jest",
