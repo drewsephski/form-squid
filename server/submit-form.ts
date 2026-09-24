@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, gte, sql } from "drizzle-orm";
-import type { NeonDatabase } from "drizzle-orm/neon-serverless";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Resend } from "resend";
 import {
@@ -14,7 +13,7 @@ import { validateSubmission } from "../app/lib/validate-submission";
 import * as schema from "../db/schema";
 import { formVersions, forms, submissions } from "../db/schema";
 
-export type SubmitDatabase = NeonDatabase<typeof schema> | NodePgDatabase<typeof schema>;
+export type SubmitDatabase = NodePgDatabase<typeof schema>;
 
 export type SubmitResponse =
   | { status: 200; body: { ok: true } }
@@ -23,19 +22,27 @@ export type SubmitResponse =
   | { status: 413; body: { ok: false; error: string } }
   | { status: 429; body: { ok: false; error: string } };
 
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 export async function submitForm(
   database: SubmitDatabase,
   input: { slug: string; rawBody: string },
 ): Promise<SubmitResponse> {
-  if (input.rawBody.length > maxSubmissionBytes) {
+  if (Buffer.byteLength(input.rawBody, "utf8") > maxSubmissionBytes) {
     return { status: 413, body: { ok: false, error: "Submission is too large." } };
   }
 
-  let body: Record<string, unknown> = {};
+  let body: unknown = {};
   try {
-    body = input.rawBody ? (JSON.parse(input.rawBody) as Record<string, unknown>) : {};
+    body = input.rawBody ? JSON.parse(input.rawBody) : {};
   } catch {
     return { status: 400, body: { ok: false, error: "Expected JSON." } };
+  }
+
+  if (!isJsonObject(body)) {
+    return { status: 400, body: { ok: false, error: "Expected a JSON object." } };
   }
 
   const honeypot = body[honeypotField];

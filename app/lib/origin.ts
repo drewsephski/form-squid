@@ -2,8 +2,14 @@ export function appOrigin() {
   return process.env.NEXT_PUBLIC_APP_ORIGIN ?? "http://localhost:3000";
 }
 
+const productionApiOrigin = "https://api.formsquid.com";
+
 export function submitUrlFor(slug: string) {
-  const apiOrigin = (process.env.FORM_API_ORIGIN ?? "https://api.formsquid.com").replace(/\/$/, "");
+  const configured = process.env.FORM_API_ORIGIN?.replace(/\/$/, "");
+  const apiOrigin = configured || (process.env.NODE_ENV === "production" ? productionApiOrigin : "");
+  if (!apiOrigin) {
+    throw new Error("FORM_API_ORIGIN must be configured.");
+  }
   return `${apiOrigin}/forms/${slug}/submissions`;
 }
 
