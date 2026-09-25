@@ -25,4 +25,12 @@ export const promptPresets = [
     label: "Feedback survey",
     prompt: "Create a short feedback survey with a satisfaction rating, what went well, and what could be better.",
   },
+  {
+    label: "Quote request",
+    prompt: "Create a quote request form with name, email, company, project type, budget, and a short description of the work.",
+  },
+  {
+    label: "Booking request",
+    prompt: "Create a booking request form with name, email, phone, preferred date, preferred time, and the reason for the visit.",
+  },
 ] as const;
