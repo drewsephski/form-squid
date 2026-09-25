@@ -20,9 +20,11 @@ interface FormViewProps {
   spec: FormSpec;
   submitUrl?: string;
   preview?: boolean;
+  /** Prefix field element ids when multiple forms render on one page. */
+  idPrefix?: string;
 }
 
-export function FormView({ spec, submitUrl, preview = false }: FormViewProps) {
+export function FormView({ spec, submitUrl, preview = false, idPrefix = "" }: FormViewProps) {
   const [stepIndex, setStepIndex] = useState(0);
   const [values, setValues] = useState<Record<string, string | number | boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -184,6 +186,7 @@ export function FormView({ spec, submitUrl, preview = false }: FormViewProps) {
           <FieldControl
             key={field.id}
             field={field}
+            idPrefix={idPrefix}
             value={values[field.id]}
             error={errors[field.id]}
             onChange={(value) => handleValue(field.id, value)}
@@ -219,13 +222,14 @@ export function FormView({ spec, submitUrl, preview = false }: FormViewProps) {
 
 interface FieldControlProps {
   field: FormField;
+  idPrefix?: string;
   value: SubmissionData[string] | undefined;
   error?: string;
   onChange: (value: string | number | boolean | undefined) => void;
 }
 
-function FieldControl({ field, value, error, onChange }: FieldControlProps) {
-  const id = `field-${field.id}`;
+function FieldControl({ field, idPrefix = "", value, error, onChange }: FieldControlProps) {
+  const id = `${idPrefix}field-${field.id}`;
   return (
     <div className="grid gap-2" data-field={field.id}>
       <Label htmlFor={id}>

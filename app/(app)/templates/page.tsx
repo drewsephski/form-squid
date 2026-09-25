@@ -29,7 +29,7 @@ export default function TemplatesPage() {
         {templates.map((template) => (
           <li key={template.slug}>
             <Link href={`/templates/${template.slug}`} className="block space-y-4 rounded-2xl border p-4 transition-colors hover:bg-muted/40">
-              <FormMiniPreview spec={template.spec} />
+              <FormMiniPreview spec={template.spec} previewId={template.slug} />
               <div className="space-y-1">
                 <p className="text-xs tracking-wide text-muted-foreground uppercase">{template.category}</p>
                 <h2 className="font-medium">{template.name}</h2>

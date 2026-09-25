@@ -22,7 +22,7 @@ export function TemplateSection() {
         {cards.map((template) => (
           <li key={template.slug}>
             <Link href={`/templates/${template.slug}`} className="block space-y-3 rounded-2xl border p-3 transition-colors hover:bg-muted/40">
-              <FormMiniPreview spec={template.spec} />
+              <FormMiniPreview spec={template.spec} previewId={template.slug} />
               <span className="block text-sm font-medium">{template.name}</span>
             </Link>
           </li>

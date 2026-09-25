@@ -110,7 +110,7 @@ export function FormsList({ forms }: { forms: FormSummary[] }) {
             <div className="flex min-w-0 flex-1 items-center gap-4">
               {form.preview ? (
                 <div className="hidden w-40 shrink-0 sm:block">
-                  <FormMiniPreview spec={form.preview} />
+                  <FormMiniPreview spec={form.preview} previewId={form.id} size="thumb" />
                 </div>
               ) : null}
               <div className="min-w-0 space-y-1">
