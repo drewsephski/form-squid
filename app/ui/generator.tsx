@@ -81,20 +81,8 @@ export function Generator() {
               </Button>
             </div>
           ) : (
-            <div className="space-y-3 py-10 text-center text-muted-foreground">
+            <div className="flex flex-col items-center justify-center text-center text-muted-foreground">
               <p>Describe your form above</p>
-              <div>
-                <p>Try:</p>
-                <ul>
-                  {promptPresets.slice(0, 3).map((preset) => (
-                    <li key={preset.label}>
-                      <button type="button" className="underline underline-offset-4" onClick={() => setPrompt(preset.prompt)}>
-                        {preset.label}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
             </div>
           )}
         </div>

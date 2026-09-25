@@ -5,6 +5,12 @@ import { compileForm } from "@/app/lib/compiler";
 import { pageMetadata } from "@/app/lib/seo";
 import { getShadcnPage, shadcnPages } from "@/app/lib/shadcn/pages";
 import { FormView } from "@/app/ui/form-view";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { SeoPageView } from "@/app/ui/seo-page-view";
 import { SourceTabs } from "@/app/ui/source-tabs";
 import { UseTemplateButton } from "@/app/ui/use-template-button";
@@ -111,12 +117,14 @@ export default async function ShadcnExamplePage({ params }: { params: Promise<{ 
 
       <section className="space-y-4" aria-labelledby="faq">
         <h2 id="faq" className="text-sm font-medium">FAQ</h2>
-        {page.faq.map((item) => (
-          <div key={item.question} className="space-y-1">
-            <h3 className="text-sm font-medium">{item.question}</h3>
-            <p className="text-sm text-muted-foreground">{item.answer}</p>
-          </div>
-        ))}
+        <Accordion>
+          {page.faq.map((item) => (
+            <AccordionItem key={item.question} value={item.question}>
+              <AccordionTrigger>{item.question}</AccordionTrigger>
+              <AccordionContent className="text-muted-foreground">{item.answer}</AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
       </section>
 
       <section className="space-y-3" aria-labelledby="related">

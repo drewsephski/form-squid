@@ -16,9 +16,10 @@ import { compileAction } from "@/app/lib/actions/compile";
 import { describeSpecChange } from "@/app/lib/diff-spec";
 import { type FormSpec } from "@/app/lib/definitions";
 import { specIssue, specsMatch } from "@/app/lib/edit-spec";
-import { hostedHost, hostedUrl } from "@/app/lib/origin";
+import { appOrigin, hostedHost, hostedUrl } from "@/app/lib/origin";
 import { labeledAnswers, submissionIdentity, submissionSearchText } from "@/app/lib/submission-display";
 import { formatPublished, formatResponseTime } from "@/lib/formatter";
+import { CodeBlock } from "@/components/ui/code-block";
 import { AppearanceSettings } from "@/app/ui/appearance-settings";
 import { FieldsInspector, FormSettings } from "@/app/ui/editor-inspector";
 import { FormView } from "@/app/ui/form-view";
@@ -416,7 +417,13 @@ export function Editor({ form }: { form: EditorForm }) {
             <h2 className="text-sm font-medium">Install published form</h2>
             {published ? (
               <>
-                <p className="font-mono text-sm">npx shadcn@latest add {typeof window === "undefined" ? "" : window.location.origin}/r/{form.registryKey}.json</p>
+                <CodeBlock
+                  code={`npx shadcn@latest add ${appOrigin()}/r/${form.registryKey}.json`}
+                  copyable
+                  label="Install command"
+                  language="bash"
+                  showLineNumbers={false}
+                />
                 {unpublished ? <p className="text-sm text-muted-foreground">The registry contains your last published version. Publish changes to update it.</p> : null}
               </>
             ) : (
@@ -445,7 +452,17 @@ export function Editor({ form }: { form: EditorForm }) {
               })}>Download</Button>
             </div>
           </div>
-          <pre className="max-h-96 overflow-auto rounded-lg border p-3 text-xs">{compiled?.formSource ?? "Copy or download to generate the source."}</pre>
+          {compiled?.formSource ? (
+            <CodeBlock
+              code={compiled.formSource}
+              filename="form.tsx"
+              label="Component source"
+              language="tsx"
+              maxHeight="24rem"
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">Copy or download to generate the source.</p>
+          )}
         </TabsContent>
       </Tabs>
     </div>

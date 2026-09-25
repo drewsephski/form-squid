@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CodeBlock } from "@/components/ui/code-block";
 import { trackFunnel, type FunnelProperties } from "@/app/lib/analytics";
 
 interface SourceTabsProps extends FunnelProperties {
@@ -15,6 +14,10 @@ export function SourceTabs({ formSource, schemaSource, page, shadcnSlug }: Sourc
     trackFunnel("source_tab_opened", { page: value === "schema" ? `${page}#schema` : page, shadcnSlug });
   }
 
+  function handleCopy() {
+    trackFunnel("source_copied", { page, shadcnSlug });
+  }
+
   return (
     <Tabs defaultValue="component" onValueChange={handleTabChange}>
       <TabsList>
@@ -22,34 +25,25 @@ export function SourceTabs({ formSource, schemaSource, page, shadcnSlug }: Sourc
         <TabsTrigger value="schema">Zod schema</TabsTrigger>
       </TabsList>
       <TabsContent value="component">
-        <SourceBlock source={formSource} label="Component source" page={page} shadcnSlug={shadcnSlug} />
+        <CodeBlock
+          code={formSource}
+          filename="form.tsx"
+          label="Component source"
+          language="tsx"
+          maxHeight="32rem"
+          onCopy={handleCopy}
+        />
       </TabsContent>
       <TabsContent value="schema">
-        <SourceBlock source={schemaSource} label="Zod schema source" page={page} shadcnSlug={shadcnSlug} />
+        <CodeBlock
+          code={schemaSource}
+          filename="schema.ts"
+          label="Zod schema source"
+          language="ts"
+          maxHeight="32rem"
+          onCopy={handleCopy}
+        />
       </TabsContent>
     </Tabs>
-  );
-}
-
-function SourceBlock({ source, label, page, shadcnSlug }: { source: string; label: string } & FunnelProperties) {
-  const [copied, setCopied] = useState(false);
-
-  async function handleCopy() {
-    await navigator.clipboard.writeText(source);
-    setCopied(true);
-    trackFunnel("source_copied", { page, shadcnSlug });
-  }
-
-  return (
-    <div className="space-y-2">
-      <div className="flex justify-end">
-        <Button type="button" variant="outline" className="rounded-full" onClick={() => void handleCopy()} aria-label={`Copy ${label}`}>
-          {copied ? "Copied" : "Copy"}
-        </Button>
-      </div>
-      <pre className="max-h-[32rem] overflow-auto rounded-xl border bg-muted/40 p-4 text-xs leading-relaxed" tabIndex={0} aria-label={label}>
-        <code>{source}</code>
-      </pre>
-    </div>
   );
 }

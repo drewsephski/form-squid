@@ -39,6 +39,11 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-blue: var(--syntax-keyword);
+  --color-blue-hover: var(--syntax-attr);
+  --color-amber-hover: var(--syntax-number);
+  --color-green: var(--syntax-string);
+  --color-brand: var(--syntax-tag);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -81,6 +86,11 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  --syntax-keyword: oklch(0.45 0.14 264);
+  --syntax-attr: oklch(0.5 0.12 230);
+  --syntax-number: oklch(0.55 0.13 75);
+  --syntax-string: oklch(0.48 0.12 155);
+  --syntax-tag: oklch(0.5 0.16 310);
 }
 
 .dark {
@@ -115,16 +125,43 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  --syntax-keyword: oklch(0.78 0.12 264);
+  --syntax-attr: oklch(0.8 0.1 220);
+  --syntax-number: oklch(0.82 0.12 85);
+  --syntax-string: oklch(0.8 0.12 155);
+  --syntax-tag: oklch(0.8 0.13 310);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklch, var(--foreground) 28%, transparent) transparent;
   }
   body {
     @apply bg-background text-foreground;
   }
   html {
     @apply font-sans;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--foreground) 22%, transparent);
+    background-clip: padding-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklch, var(--foreground) 42%, transparent);
+    background-clip: padding-box;
+  }
+  *::-webkit-scrollbar-corner {
+    background: transparent;
   }
 }
