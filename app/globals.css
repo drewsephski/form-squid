@@ -169,8 +169,11 @@
 .generate-loader {
   --size: 250px;
   --duration: 2s;
-  --logo-color: grey;
-  --background: linear-gradient(0deg, rgba(50, 50, 50, 0.2) 0%, rgba(100, 100, 100, 0.2) 100%);
+  --background: linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.06) 0%,
+    rgba(255, 255, 255, 0.14) 100%
+  );
   height: var(--size);
   aspect-ratio: 1;
   position: relative;
@@ -180,8 +183,8 @@
   position: absolute;
   background: var(--background);
   border-radius: 50%;
-  border-top: 1px solid rgba(100, 100, 100, 1);
-  box-shadow: rgba(0, 0, 0, 0.3) 0px 10px 10px 0px;
+  border-top: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: rgba(0, 0, 0, 0.45) 0px 10px 14px 0px;
   animation: generate-ripple var(--duration) infinite ease-in-out;
 }
 
@@ -199,28 +202,28 @@
 .generate-loader .box:nth-child(2) {
   inset: 30%;
   z-index: 98;
-  border-color: rgba(100, 100, 100, 0.8);
+  border-color: rgba(255, 255, 255, 0.7);
   animation-delay: 0.2s;
 }
 
 .generate-loader .box:nth-child(3) {
   inset: 20%;
   z-index: 97;
-  border-color: rgba(100, 100, 100, 0.6);
+  border-color: rgba(255, 255, 255, 0.5);
   animation-delay: 0.4s;
 }
 
 .generate-loader .box:nth-child(4) {
   inset: 10%;
   z-index: 96;
-  border-color: rgba(100, 100, 100, 0.4);
+  border-color: rgba(255, 255, 255, 0.32);
   animation-delay: 0.6s;
 }
 
 .generate-loader .box:nth-child(5) {
   inset: 0%;
   z-index: 95;
-  border-color: rgba(100, 100, 100, 0.2);
+  border-color: rgba(255, 255, 255, 0.18);
   animation-delay: 0.8s;
 }
 
@@ -237,20 +240,21 @@
   height: 100%;
   object-fit: contain;
   mix-blend-mode: screen;
+  filter: brightness(1.35) contrast(1.1);
   transform: scale(3.6);
 }
 
 @keyframes generate-ripple {
   0% {
     transform: scale(1);
-    box-shadow: rgba(0, 0, 0, 0.3) 0px 10px 10px 0px;
+    box-shadow: rgba(0, 0, 0, 0.45) 0px 10px 14px 0px;
   }
   50% {
     transform: scale(1.3);
-    box-shadow: rgba(0, 0, 0, 0.3) 0px 30px 20px 0px;
+    box-shadow: rgba(0, 0, 0, 0.55) 0px 30px 24px 0px;
   }
   100% {
     transform: scale(1);
-    box-shadow: rgba(0, 0, 0, 0.3) 0px 10px 10px 0px;
+    box-shadow: rgba(0, 0, 0, 0.45) 0px 10px 14px 0px;
   }
 }
