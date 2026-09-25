@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { generateAction } from "@/app/lib/actions/generate";
-import { trackFunnel } from "@/app/lib/analytics";
+import { saveForm } from "@/app/lib/actions/forms-write";
+import { currentReferrer, trackFunnel } from "@/app/lib/analytics";
 import { pendingSpecKey, type FormSpec } from "@/app/lib/definitions";
 import { promptPresets } from "@/app/lib/prompt-presets";
 import { FormView } from "@/app/ui/form-view";
+import { authClient } from "@/lib/auth-client";
 
 export function Generator() {
   const router = useRouter();
@@ -16,6 +18,7 @@ export function Generator() {
   const [spec, setSpec] = useState<FormSpec | null>(null);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   async function handleGenerate() {
     setPending(true);
@@ -32,9 +35,28 @@ export function Generator() {
     window.localStorage.setItem(pendingSpecKey, JSON.stringify(result.spec));
   }
 
-  function handleSave() {
-    if (!spec) {
+  async function handleSave() {
+    if (!spec || saving) {
       return;
+    }
+    setSaving(true);
+    setError("");
+    const session = await authClient.getSession();
+    const authenticated = Boolean(session.data?.user);
+    const properties = { page: "/", authenticated, referrer: currentReferrer() };
+    trackFunnel("customize_clicked", properties);
+    if (authenticated) {
+      try {
+        const saved = await saveForm(spec);
+        trackFunnel("form_created", properties);
+        window.localStorage.removeItem(pendingSpecKey);
+        router.push(`/forms/${saved.id}`);
+        return;
+      } catch (caught) {
+        setSaving(false);
+        setError(caught instanceof Error ? caught.message : "Could not save the form.");
+        return;
+      }
     }
     window.localStorage.setItem(pendingSpecKey, JSON.stringify(spec));
     router.push("/sign-up");
@@ -76,8 +98,8 @@ export function Generator() {
           {spec ? (
             <div className="space-y-6">
               <FormView spec={spec} preview />
-              <Button type="button" variant="outline" className="h-11 w-full rounded-full" onClick={handleSave}>
-                Save & customize
+              <Button type="button" variant="outline" className="h-11 w-full rounded-full" onClick={() => void handleSave()} disabled={saving}>
+                {saving ? "Saving" : "Save & customize"}
               </Button>
             </div>
           ) : (

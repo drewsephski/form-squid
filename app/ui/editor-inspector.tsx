@@ -57,15 +57,19 @@ function canonicalNumberEquals(raw: string) {
 
 function ConditionValue({ parent, equals, onEquals }: { parent: FormField; equals: string; onEquals: (value: string) => void }) {
   if (parent.type === "select" || parent.type === "radio") {
+    const items = (parent.options ?? []).map((option) => ({
+      value: option.value,
+      label: option.label,
+    }));
     return (
-      <Select value={equals} onValueChange={(value) => { if (value) onEquals(value); }}>
+      <Select items={items} value={equals} onValueChange={(value) => { if (value) onEquals(value); }}>
         <SelectTrigger id="condition-value" className="w-full">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {parent.options?.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
+          {items.map((item) => (
+            <SelectItem key={item.value} value={item.value}>
+              {item.label}
             </SelectItem>
           ))}
         </SelectContent>
@@ -74,14 +78,21 @@ function ConditionValue({ parent, equals, onEquals }: { parent: FormField; equal
   }
 
   if (parent.type === "checkbox") {
+    const items = [
+      { value: "true", label: "true" },
+      { value: "false", label: "false" },
+    ];
     return (
-      <Select value={equals} onValueChange={(value) => { if (value) onEquals(value); }}>
+      <Select items={items} value={equals} onValueChange={(value) => { if (value) onEquals(value); }}>
         <SelectTrigger id="condition-value" className="w-full">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="true">true</SelectItem>
-          <SelectItem value="false">false</SelectItem>
+          {items.map((item) => (
+            <SelectItem key={item.value} value={item.value}>
+              {item.label}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
     );
@@ -116,6 +127,16 @@ export function FieldsInspector({ spec, selectedId, onSpec, onSelect }: EditorIn
 
   if (selected) {
     const choice = selected.type === "select" || selected.type === "radio";
+    const typeItems = fieldTypes.map((type) => ({
+      value: type,
+      label: fieldTypeLabels[type],
+    }));
+    const conditionFields = earlierFields(spec, selected.id);
+    const conditionFieldItems = conditionFields.map((field) => ({
+      value: field.id,
+      label: field.label,
+    }));
+    const conditionOperatorItems = [{ value: "equals", label: "equals" }];
     return (
       <div className="space-y-4">
         <Button type="button" variant="ghost" className="px-0" onClick={() => onSelect("")}>
@@ -124,6 +145,7 @@ export function FieldsInspector({ spec, selectedId, onSpec, onSelect }: EditorIn
         <div className="grid gap-2">
           <Label htmlFor="field-type">Type</Label>
           <Select
+            items={typeItems}
             value={selected.type}
             onValueChange={(value) => {
               if (value) {
@@ -135,9 +157,9 @@ export function FieldsInspector({ spec, selectedId, onSpec, onSelect }: EditorIn
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {fieldTypes.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {fieldTypeLabels[type]}
+              {typeItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -171,7 +193,7 @@ export function FieldsInspector({ spec, selectedId, onSpec, onSelect }: EditorIn
         </label>
         <div className="grid gap-3 rounded-lg border p-3">
           <p className="text-sm font-medium">Conditional visibility</p>
-          {earlierFields(spec, selected.id).length === 0 ? (
+          {conditionFields.length === 0 ? (
             <p className="text-sm text-muted-foreground">Add a field above this one to show it conditionally.</p>
           ) : (
             <>
@@ -183,7 +205,7 @@ export function FieldsInspector({ spec, selectedId, onSpec, onSelect }: EditorIn
                       onSpec(setVisibleWhen(spec, selected.id, undefined));
                       return;
                     }
-                    const parent = earlierFields(spec, selected.id)[0];
+                    const parent = conditionFields[0];
                     if (!parent) {
                       return;
                     }
@@ -197,9 +219,10 @@ export function FieldsInspector({ spec, selectedId, onSpec, onSelect }: EditorIn
                   <div className="grid gap-2">
                     <Label htmlFor="condition-field">Field</Label>
                     <Select
+                      items={conditionFieldItems}
                       value={selected.visibleWhen.fieldId}
                       onValueChange={(value) => {
-                        const parent = earlierFields(spec, selected.id).find((field) => field.id === value);
+                        const parent = conditionFields.find((field) => field.id === value);
                         if (!parent) {
                           return;
                         }
@@ -210,9 +233,9 @@ export function FieldsInspector({ spec, selectedId, onSpec, onSelect }: EditorIn
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {earlierFields(spec, selected.id).map((field) => (
-                          <SelectItem key={field.id} value={field.id}>
-                            {field.label}
+                        {conditionFieldItems.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -220,19 +243,23 @@ export function FieldsInspector({ spec, selectedId, onSpec, onSelect }: EditorIn
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="condition-operator">Condition</Label>
-                    <Select value="equals" disabled>
+                    <Select items={conditionOperatorItems} value="equals" disabled>
                       <SelectTrigger id="condition-operator" className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="equals">equals</SelectItem>
+                        {conditionOperatorItems.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="condition-value">Value</Label>
                     {(() => {
-                      const parent = earlierFields(spec, selected.id).find((field) => field.id === selected.visibleWhen?.fieldId);
+                      const parent = conditionFields.find((field) => field.id === selected.visibleWhen?.fieldId);
                       if (!parent || !selected.visibleWhen) {
                         return null;
                       }

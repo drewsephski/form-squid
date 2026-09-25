@@ -221,7 +221,11 @@ function FieldControl({ field, value, error, onChange }: FieldControlProps) {
         <Textarea id={id} placeholder={field.placeholder} value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)} aria-invalid={Boolean(error)} aria-required={field.required} />
       ) : null}
       {field.type === "select" ? (
-        <Select value={typeof value === "string" ? value : undefined} onValueChange={(next) => { if (next) onChange(next); }}>
+        <Select
+          items={(field.options ?? []).map((option) => ({ value: option.value, label: option.label }))}
+          value={typeof value === "string" ? value : undefined}
+          onValueChange={(next) => { if (next) onChange(next); }}
+        >
           <SelectTrigger id={id} aria-invalid={Boolean(error)} aria-required={field.required}>
             <SelectValue placeholder={field.placeholder ?? "Select"} />
           </SelectTrigger>

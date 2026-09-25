@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
+import { Logo } from "@/app/ui/logo";
 
 export async function SiteHeader() {
   const session = await auth.api.getSession({ headers: await headers() });
 
   return (
-    <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-4 py-5">
-      <Link href="/" className="font-heading text-xl tracking-tight" aria-label="FormSquid home">
-        FormSquid
+    <header className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-5">
+      <Link href="/" className="shrink-0" aria-label="FormSquid home">
+        <Logo priority className="h-6 sm:h-7" />
       </Link>
       <nav className="flex items-center gap-5 text-sm text-muted-foreground">
         <Link href="/templates" className="transition-colors duration-300 hover:text-foreground">
@@ -40,7 +41,9 @@ export function SiteFooter() {
   return (
     <footer className="mx-auto flex w-full max-w-5xl items-center justify-between px-4 py-6 text-xs text-muted-foreground">
       <p>Generate it. Host it. Own the code.</p>
-      <p>FormSquid</p>
+      <Link href="/" aria-label="FormSquid home">
+        <Logo className="h-5" />
+      </Link>
     </footer>
   );
 }

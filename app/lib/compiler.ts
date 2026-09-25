@@ -296,7 +296,7 @@ function renderControl(field: (typeof spec.steps)[number]["fields"][number], con
   }
   if (field.type === "select") {
     return (
-      <Select value={String(control.value ?? "")} onValueChange={control.onChange}>
+      <Select items={field.options?.map((option) => ({ label: option.label, value: option.value }))} value={String(control.value ?? "")} onValueChange={control.onChange}>
         <SelectTrigger>
           <SelectValue placeholder={field.placeholder ?? "Select"} />
         </SelectTrigger>
