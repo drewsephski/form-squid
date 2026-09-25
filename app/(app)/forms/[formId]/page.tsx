@@ -10,8 +10,8 @@ export default async function FormPage({ params }: { params: Promise<{ formId: s
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-4 py-8">
-      <div className="my-auto">
+    <main className="mx-auto flex w-full min-w-0 max-w-6xl flex-1 flex-col justify-center px-4 py-8">
+      <div className="my-auto min-w-0 w-full">
         <Editor form={form} />
       </div>
     </main>

@@ -19,12 +19,12 @@ export function SourceTabs({ formSource, schemaSource, page, shadcnSlug }: Sourc
   }
 
   return (
-    <Tabs defaultValue="component" onValueChange={handleTabChange}>
+    <Tabs defaultValue="component" className="min-w-0" onValueChange={handleTabChange}>
       <TabsList>
         <TabsTrigger value="component">Component</TabsTrigger>
         <TabsTrigger value="schema">Zod schema</TabsTrigger>
       </TabsList>
-      <TabsContent value="component">
+      <TabsContent value="component" className="min-w-0">
         <CodeBlock
           code={formSource}
           filename="form.tsx"
@@ -34,7 +34,7 @@ export function SourceTabs({ formSource, schemaSource, page, shadcnSlug }: Sourc
           onCopy={handleCopy}
         />
       </TabsContent>
-      <TabsContent value="schema">
+      <TabsContent value="schema" className="min-w-0">
         <CodeBlock
           code={schemaSource}
           filename="schema.ts"

@@ -193,9 +193,9 @@ export function Editor({ form }: { form: EditorForm }) {
   }
 
   return (
-    <div className="grid gap-8">
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="space-y-3">
+    <div className="grid min-w-0 gap-8">
+      <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="min-w-0 space-y-3">
           <div className="flex gap-2" role="group" aria-label="Preview size">
             <Button type="button" variant={previewDevice === "desktop" ? "default" : "outline"} onClick={() => setPreviewDevice("desktop")}>
               Desktop
@@ -204,20 +204,20 @@ export function Editor({ form }: { form: EditorForm }) {
               Mobile
             </Button>
           </div>
-          <div className={previewDevice === "mobile" ? "mx-auto w-[390px] max-w-full" : undefined}>
-            <div className="rounded-xl border bg-muted/30 p-6">
+          <div className={previewDevice === "mobile" ? "mx-auto w-[390px] max-w-full" : "min-w-0"}>
+            <div className="min-w-0 overflow-x-auto rounded-xl border bg-muted/30 p-6">
               <FormView spec={spec} preview />
             </div>
           </div>
         </div>
-        <Tabs defaultValue="ai">
+        <Tabs defaultValue="ai" className="min-w-0">
           <TabsList className="flex h-auto flex-wrap">
             <TabsTrigger value="ai">AI</TabsTrigger>
             <TabsTrigger value="fields">Fields</TabsTrigger>
             <TabsTrigger value="form">Form</TabsTrigger>
             <TabsTrigger value="appearance">Appearance</TabsTrigger>
           </TabsList>
-          <TabsContent value="ai" className="space-y-3">
+          <TabsContent value="ai" className="min-w-0 space-y-3">
             <Textarea aria-label="Edit instruction" value={instruction} onChange={(event) => setInstruction(event.target.value)} placeholder="Split this into two steps." />
             <Button type="button" onClick={() => void handleEdit()} disabled={pending}>Ask FormSquid</Button>
             {candidate ? (
@@ -229,13 +229,13 @@ export function Editor({ form }: { form: EditorForm }) {
               </div>
             ) : null}
           </TabsContent>
-          <TabsContent value="fields">
+          <TabsContent value="fields" className="min-w-0">
             <FieldsInspector spec={spec} slug={slug} selectedId={selectedFieldId} onSpec={setSpec} onSlug={setSlug} onSelect={setSelectedFieldId} />
           </TabsContent>
-          <TabsContent value="form">
+          <TabsContent value="form" className="min-w-0">
             <FormSettings spec={spec} slug={slug} selectedId={selectedFieldId} onSpec={setSpec} onSlug={setSlug} onSelect={setSelectedFieldId} />
           </TabsContent>
-          <TabsContent value="appearance">
+          <TabsContent value="appearance" className="min-w-0">
             <AppearanceSettings spec={spec} onSpec={setSpec} />
           </TabsContent>
         </Tabs>
@@ -277,12 +277,12 @@ export function Editor({ form }: { form: EditorForm }) {
           </Button>
         </div>
       </div>
-      <Tabs defaultValue="submissions">
+      <Tabs defaultValue="submissions" className="min-w-0">
         <TabsList>
           <TabsTrigger value="submissions">Submissions</TabsTrigger>
           <TabsTrigger value="code">Code</TabsTrigger>
         </TabsList>
-        <TabsContent value="submissions" className="space-y-4">
+        <TabsContent value="submissions" className="min-w-0 space-y-4">
           <form
             className="flex gap-2"
             onSubmit={(event) => {
@@ -412,8 +412,8 @@ export function Editor({ form }: { form: EditorForm }) {
             </div>
           ) : null}
         </TabsContent>
-        <TabsContent value="code" className="space-y-4">
-          <div className="space-y-2">
+        <TabsContent value="code" className="min-w-0 space-y-4">
+          <div className="min-w-0 space-y-2">
             <h2 className="text-sm font-medium">Install published form</h2>
             {published ? (
               <>
@@ -430,7 +430,7 @@ export function Editor({ form }: { form: EditorForm }) {
               <p className="text-sm text-muted-foreground">Publish this form to get a shadcn registry install command.</p>
             )}
           </div>
-          <div className="space-y-2">
+          <div className="min-w-0 space-y-2">
             <h2 className="text-sm font-medium">Current draft source</h2>
             {!published || unpublished ? (
               <p className="text-sm text-muted-foreground">

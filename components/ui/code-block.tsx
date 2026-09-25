@@ -399,14 +399,14 @@ export function CodeBlock({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-xl border border-border bg-muted/30 font-mono",
+        "w-full min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-muted/30 font-mono",
         className,
       )}
       ref={containerRef}
     >
       {filename || copyable ? (
-        <div className="flex items-center justify-between gap-3 border-b border-border bg-muted/50 px-3 py-2">
-          <div className="flex items-center gap-2 overflow-hidden font-sans text-xs text-muted-foreground">
+        <div className="flex min-w-0 items-center justify-between gap-3 border-b border-border bg-muted/50 px-3 py-2">
+          <div className="flex min-w-0 items-center gap-2 overflow-hidden font-sans text-xs text-muted-foreground">
             {filename ? (
               <span className="truncate font-medium text-foreground">
                 {filename}
@@ -418,18 +418,21 @@ export function CodeBlock({
         </div>
       ) : null}
       <div
-        className={wrap ? "overflow-y-auto" : "overflow-auto"}
+        className={cn(
+          "min-w-0",
+          wrap ? "overflow-x-hidden overflow-y-auto" : "overflow-auto",
+        )}
         style={maxHeightValue ? { maxHeight: maxHeightValue } : undefined}
       >
         <pre
           aria-label={label}
           className={cn(
-            "m-0 py-3 text-[13px] leading-relaxed",
-            wrap ? "break-words whitespace-pre-wrap" : "whitespace-pre",
+            "m-0 max-w-full py-3 text-[13px] leading-relaxed",
+            wrap ? "break-words whitespace-pre-wrap" : "w-max min-w-full whitespace-pre",
           )}
           tabIndex={0}
         >
-          <code>
+          <code className="block min-w-0">
             {lines.map((lineTokens, lineIndex) => {
               const lineNumber = lineIndex + 1;
               const isHighlighted = highlightSet.has(lineNumber);
@@ -437,6 +440,7 @@ export function CodeBlock({
                 <div
                   className={cn(
                     "flex gap-3 border-l-2 border-transparent px-3",
+                    wrap ? "min-w-0" : "w-max min-w-full",
                     isHighlighted &&
                     "border-brand bg-foreground/[0.045] dark:bg-foreground/[0.07]",
                   )}
@@ -454,7 +458,7 @@ export function CodeBlock({
                       {lineNumber}
                     </span>
                   ) : null}
-                  <span className="flex-1">
+                  <span className={cn(wrap ? "min-w-0 flex-1 break-words" : "block")}>
                     {lineTokens.length === 0
                       ? "\u00a0"
                       : lineTokens.map((token, tokenIndex) => (

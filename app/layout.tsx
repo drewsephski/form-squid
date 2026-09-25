@@ -33,8 +33,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       lang="en"
       className={`${fraunces.variable} ${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
     >
-      <body className="flex min-h-dvh flex-col bg-background font-sans text-foreground">
-        <div className="flex flex-1 flex-col">{children}</div>
+      <body className="flex min-h-dvh flex-col overflow-x-hidden bg-background font-sans text-foreground">
+        <div className="flex min-w-0 flex-1 flex-col">{children}</div>
         <Toaster />
         <FunnelAnalytics />
       </body>
