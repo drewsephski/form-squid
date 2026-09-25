@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { appearanceClassName, appearanceStyle, resolveAppearance, submitClassName } from "@/app/lib/appearance";
 import { honeypotField, type FormField, type FormSpec, type SubmissionData } from "@/app/lib/definitions";
 import { parseNumberInput } from "@/app/lib/number-input";
 import { fieldIsVisible } from "@/app/lib/submission-algorithm";
@@ -28,6 +29,10 @@ export function FormView({ spec, submitUrl, preview = false }: FormViewProps) {
   const [pending, setPending] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const step = spec.steps[stepIndex];
+  const appearance = resolveAppearance(spec);
+  const frameClass = appearanceClassName(appearance);
+  const frameStyle = appearanceStyle(appearance);
+  const actionClass = submitClassName(appearance);
 
   if (!step) {
     return null;
@@ -117,7 +122,7 @@ export function FormView({ spec, submitUrl, preview = false }: FormViewProps) {
 
   if (done) {
     return (
-      <div className="space-y-4 py-8 text-center">
+      <div className={`${frameClass} space-y-4 rounded-xl px-6 py-8 text-center`} style={frameStyle} data-formsquid-theme={appearance.theme}>
         <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-primary/15 text-lg text-primary" aria-hidden="true">
           ✓
         </div>
@@ -136,7 +141,9 @@ export function FormView({ spec, submitUrl, preview = false }: FormViewProps) {
 
   return (
     <form
-      className="space-y-6"
+      className={`${frameClass} space-y-6 rounded-xl px-6 py-6`}
+      style={frameStyle}
+      data-formsquid-theme={appearance.theme}
       onSubmit={(event) => {
         event.preventDefault();
         if (stepIndex < spec.steps.length - 1) {
@@ -186,7 +193,7 @@ export function FormView({ spec, submitUrl, preview = false }: FormViewProps) {
             Back
           </Button>
         ) : null}
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" className={actionClass} disabled={pending}>
           {pending ? "Sending…" : stepIndex < spec.steps.length - 1 ? "Next" : spec.submitLabel}
         </Button>
       </div>

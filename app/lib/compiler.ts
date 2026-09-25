@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import ts from "typescript";
+import { appearanceClassName, appearanceStyle, resolveAppearance, submitClassName } from "./appearance";
 import { formSpecSchema, type FormSpec } from "./definitions";
 
 export type CompiledForm = {
@@ -71,6 +72,7 @@ ${stepEntries}
 }
 
 function formSource(spec: FormSpec, submitUrl: string): string {
+  const appearance = resolveAppearance(spec);
   return `"use client";
 
 import { useState } from "react";
@@ -114,6 +116,10 @@ const spec = ${JSON.stringify(spec, null, 2)} as {
   }>;
 };
 const submitUrl = ${JSON.stringify(submitUrl)};
+const appearanceClassName = ${JSON.stringify(appearanceClassName(appearance))};
+const appearanceStyle = ${JSON.stringify(appearanceStyle(appearance))};
+const submitClassName = ${JSON.stringify(submitClassName(appearance))};
+const appearanceTheme = ${JSON.stringify(appearance.theme)};
 
 function parseNumberInput(raw: string): number | undefined {
   if (raw === "") {
@@ -175,12 +181,16 @@ export function ExportedForm() {
   }
 
   if (done) {
-    return <p>{spec.successMessage}</p>;
+    return (
+      <div className={appearanceClassName + " space-y-4 rounded-xl px-6 py-8 text-center"} style={appearanceStyle} data-formsquid-theme={appearanceTheme}>
+        <p>{spec.successMessage}</p>
+      </div>
+    );
   }
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className={appearanceClassName + " space-y-6 rounded-xl px-6 py-6"} style={appearanceStyle} data-formsquid-theme={appearanceTheme}>
         <div>
           <h1 className="text-2xl font-semibold">{spec.title}</h1>
           {spec.description ? <p className="text-muted-foreground">{spec.description}</p> : null}
@@ -221,11 +231,11 @@ export function ExportedForm() {
             </Button>
           ) : null}
           {stepIndex < spec.steps.length - 1 ? (
-            <Button type="button" onClick={handleNext}>
+            <Button type="button" className={submitClassName} onClick={handleNext}>
               Next
             </Button>
           ) : (
-            <Button type="submit">{spec.submitLabel}</Button>
+            <Button type="submit" className={submitClassName}>{spec.submitLabel}</Button>
           )}
         </div>
         {submitError ? <p role="alert">{submitError}</p> : null}

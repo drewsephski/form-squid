@@ -21,12 +21,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { deleteForm, duplicateForm, unpublishForm } from "@/app/lib/actions/forms-write";
+import type { FormSpec } from "@/app/lib/definitions";
 import { hostedUrl } from "@/app/lib/origin";
+import { FormMiniPreview } from "@/app/ui/form-mini-preview";
 import { formatUpdated } from "@/lib/formatter";
 
 interface FormSummary {
   id: string;
   title: string;
+  preview: FormSpec | null;
   slug: string;
   host: string;
   published: boolean;
@@ -104,7 +107,13 @@ export function FormsList({ forms }: { forms: FormSummary[] }) {
       <ul className="grid gap-3">
         {forms.map((form) => (
           <li key={form.id} className="flex flex-wrap items-center justify-between gap-4 rounded-xl border p-4">
-            <div className="min-w-0 space-y-1">
+            <div className="flex min-w-0 flex-1 items-center gap-4">
+              {form.preview ? (
+                <div className="hidden w-40 shrink-0 sm:block">
+                  <FormMiniPreview spec={form.preview} />
+                </div>
+              ) : null}
+              <div className="min-w-0 space-y-1">
               <p className="truncate font-medium">{form.title}</p>
               <p className="text-sm">
                 <span className={`mr-2 inline-block size-2 rounded-full align-middle ${form.published ? "bg-primary" : "bg-muted-foreground"}`} aria-hidden="true" />
@@ -114,6 +123,7 @@ export function FormsList({ forms }: { forms: FormSummary[] }) {
               <p className="text-sm text-muted-foreground">
                 {form.responses} {form.responses === 1 ? "response" : "responses"} · {formatUpdated(form.updatedAt)}
               </p>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               {form.published ? (

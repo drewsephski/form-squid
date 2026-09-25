@@ -1,4 +1,5 @@
 import { Generator } from "@/app/ui/generator";
+import { TemplateSection } from "@/app/ui/template-section";
 
 export default function Home() {
   return (
@@ -14,6 +15,7 @@ export default function Home() {
           </p>
         </div>
         <Generator />
+        <TemplateSection />
       </div>
     </main>
   );

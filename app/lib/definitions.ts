@@ -48,6 +48,14 @@ export const stepSchema = z.object({
   fields: z.array(fieldSchema).min(1).max(40),
 });
 
+export const appearanceSchema = z.object({
+  theme: z.enum(["light", "dark"]),
+  accent: z.enum(["neutral", "blue", "violet", "green", "orange", "rose"]),
+  radius: z.enum(["none", "md", "xl"]),
+  width: z.enum(["sm", "md", "lg"]),
+  submitWidth: z.enum(["auto", "full"]),
+});
+
 export const formSpecSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -56,6 +64,7 @@ export const formSpecSchema = z
     submitLabel: plainText(200),
     successMessage: plainText(1000),
     steps: z.array(stepSchema).min(1).max(5),
+    appearance: appearanceSchema.optional(),
   })
   .superRefine((spec, context) => {
     const seen = new Set<string>();

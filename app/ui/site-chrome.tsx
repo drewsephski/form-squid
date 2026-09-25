@@ -11,6 +11,9 @@ export async function SiteHeader() {
         FormSquid
       </Link>
       <nav className="flex items-center gap-5 text-sm text-muted-foreground">
+        <Link href="/templates" className="transition-colors duration-300 hover:text-foreground">
+          Templates
+        </Link>
         {session?.user ? (
           <>
             <Link href="/forms" className="transition-colors duration-300 hover:text-foreground">

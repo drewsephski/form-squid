@@ -18,6 +18,7 @@ import { specIssue, specsMatch } from "@/app/lib/edit-spec";
 import { hostedHost, hostedUrl } from "@/app/lib/origin";
 import { labeledAnswers, submissionIdentity, submissionSearchText } from "@/app/lib/submission-display";
 import { formatPublished, formatResponseTime } from "@/lib/formatter";
+import { AppearanceSettings } from "@/app/ui/appearance-settings";
 import { FieldsInspector, FormSettings } from "@/app/ui/editor-inspector";
 import { FormView } from "@/app/ui/form-view";
 
@@ -65,6 +66,7 @@ export function Editor({ form }: { form: EditorForm }) {
   const [pending, setPending] = useState(false);
   const [compiled, setCompiled] = useState<{ schemaSource: string; formSource: string } | null>(null);
   const [previewVersionId, setPreviewVersionId] = useState("");
+  const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
   const saveSeq = useRef(0);
   const writeQueue = useRef<Promise<void>>(Promise.resolve());
   const serverSubmissions = useRef(form.submissions);
@@ -126,7 +128,7 @@ export function Editor({ form }: { form: EditorForm }) {
   const selectedSpec = selected ? form.versions.find((version) => version.id === selected.formVersionId)?.spec ?? null : null;
   const published = Boolean(publishedSpec);
   const unpublished = publishedSpec !== null && (!specsMatch(spec, publishedSpec) || slug !== publishedSlug);
-  const sourceSlug = published ? publishedSlug : slug;
+  const sourceSlug = slug;
   const previewVersion = form.versions.find((version) => version.id === previewVersionId) ?? null;
   const status = showSaving
     ? "Saving…"
@@ -190,14 +192,27 @@ export function Editor({ form }: { form: EditorForm }) {
   return (
     <div className="grid gap-8">
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="rounded-xl border p-6">
-          <FormView spec={spec} preview />
+        <div className="space-y-3">
+          <div className="flex gap-2" role="group" aria-label="Preview size">
+            <Button type="button" variant={previewDevice === "desktop" ? "default" : "outline"} onClick={() => setPreviewDevice("desktop")}>
+              Desktop
+            </Button>
+            <Button type="button" variant={previewDevice === "mobile" ? "default" : "outline"} onClick={() => setPreviewDevice("mobile")}>
+              Mobile
+            </Button>
+          </div>
+          <div className={previewDevice === "mobile" ? "mx-auto w-[390px] max-w-full" : undefined}>
+            <div className="rounded-xl border bg-muted/30 p-6">
+              <FormView spec={spec} preview />
+            </div>
+          </div>
         </div>
         <Tabs defaultValue="ai">
-          <TabsList>
+          <TabsList className="flex h-auto flex-wrap">
             <TabsTrigger value="ai">AI</TabsTrigger>
             <TabsTrigger value="fields">Fields</TabsTrigger>
             <TabsTrigger value="form">Form</TabsTrigger>
+            <TabsTrigger value="appearance">Appearance</TabsTrigger>
           </TabsList>
           <TabsContent value="ai" className="space-y-3">
             <Textarea aria-label="Edit instruction" value={instruction} onChange={(event) => setInstruction(event.target.value)} placeholder="Split this into two steps." />
@@ -216,6 +231,9 @@ export function Editor({ form }: { form: EditorForm }) {
           </TabsContent>
           <TabsContent value="form">
             <FormSettings spec={spec} slug={slug} selectedId={selectedFieldId} onSpec={setSpec} onSlug={setSlug} onSelect={setSelectedFieldId} />
+          </TabsContent>
+          <TabsContent value="appearance">
+            <AppearanceSettings spec={spec} onSpec={setSpec} />
           </TabsContent>
         </Tabs>
       </div>
@@ -405,6 +423,11 @@ export function Editor({ form }: { form: EditorForm }) {
           </div>
           <div className="space-y-2">
             <h2 className="text-sm font-medium">Current draft source</h2>
+            {!published || unpublished ? (
+              <p className="text-sm text-muted-foreground">
+                Draft source uses the draft address. Publish these changes before FormSquid-hosted submissions will accept this version.
+              </p>
+            ) : null}
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" onClick={() => void compileAction(spec, sourceSlug).then((result) => { setCompiled(result); void navigator.clipboard.writeText(result.formSource); })}>Copy component</Button>
               <Button type="button" variant="outline" onClick={() => void compileAction(spec, sourceSlug).then((result) => { setCompiled(result); void navigator.clipboard.writeText(result.schemaSource); })}>Copy schema</Button>

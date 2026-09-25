@@ -1,6 +1,6 @@
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { generateText, NoObjectGeneratedError, Output } from "ai";
-import { aiFormSpecSchema, type FormSpec } from "./definitions";
+import { aiFormSpecSchema, formSpecSchema, type FormSpec } from "./definitions";
 import { normalizeFormSpec } from "./normalize-form-spec";
 
 const instructions = [
@@ -39,12 +39,12 @@ export async function generateFormSpec(prompt: string, current?: FormSpec): Prom
           lastError ? `The last result failed validation:\n${lastError}` : "",
         ].join("\n\n"),
       });
-      return normalizeFormSpec(output);
+      return withAppearance(normalizeFormSpec(output), current);
     } catch (error) {
       const text = NoObjectGeneratedError.isInstance(error) ? error.text : undefined;
       if (text) {
         try {
-          return normalizeFormSpec(JSON.parse(text));
+          return withAppearance(normalizeFormSpec(JSON.parse(text)), current);
         } catch (parseError) {
           lastError = parseError instanceof Error ? parseError.message : "Invalid form";
           continue;
@@ -55,4 +55,11 @@ export async function generateFormSpec(prompt: string, current?: FormSpec): Prom
   }
 
   throw new Error(lastError || "Could not generate a valid form.");
+}
+
+function withAppearance(spec: FormSpec, current?: FormSpec) {
+  if (!current?.appearance) {
+    return spec;
+  }
+  return formSpecSchema.parse({ ...spec, appearance: current.appearance });
 }

@@ -85,6 +85,7 @@ export async function listForms() {
     return {
       id: row.id,
       title: spec.success ? spec.data.title : row.slug,
+      preview: spec.success ? spec.data : null,
       slug: row.slug,
       host: hostedHost(row.slug),
       published: Boolean(row.currentPublishedVersionId),
