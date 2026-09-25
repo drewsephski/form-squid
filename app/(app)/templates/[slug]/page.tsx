@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { pageMetadata } from "@/app/lib/seo";
 import { getTemplate, templates } from "@/app/lib/templates";
+import { templateSeo } from "@/app/lib/templates/seo";
 import { FormView } from "@/app/ui/form-view";
 import { UseTemplateButton } from "@/app/ui/use-template-button";
 
@@ -12,13 +14,15 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const template = getTemplate(slug);
-  if (!template) {
-    return { title: "Template · FormSquid" };
+  const seo = template ? templateSeo[template.slug] : undefined;
+  if (!template || !seo) {
+    return { title: "Form Template | FormSquid" };
   }
-  return {
-    title: `${template.name} · FormSquid`,
-    description: template.description,
-  };
+  return pageMetadata({
+    title: seo.title,
+    description: seo.description,
+    path: `/templates/${template.slug}`,
+  });
 }
 
 export default async function TemplatePage({ params }: { params: Promise<{ slug: string }> }) {
@@ -28,6 +32,7 @@ export default async function TemplatePage({ params }: { params: Promise<{ slug:
     notFound();
   }
   const fields = template.spec.steps.flatMap((step) => step.fields);
+  const seo = templateSeo[template.slug];
 
   return (
     <main className="mx-auto grid w-full max-w-5xl flex-1 gap-10 px-4 py-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
@@ -52,6 +57,13 @@ export default async function TemplatePage({ params }: { params: Promise<{ slug:
         <Link href="/templates" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
           All templates
         </Link>
+        {seo ? (
+          <p className="text-sm">
+            <Link href={seo.reactHref} className="underline-offset-4 hover:underline">
+              {seo.reactLabel}
+            </Link>
+          </p>
+        ) : null}
       </aside>
     </main>
   );

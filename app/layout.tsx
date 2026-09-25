@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { siteOrigin } from "@/app/lib/seo";
 import "./globals.css";
 
 const fraunces = Fraunces({
@@ -20,6 +21,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteOrigin),
   title: "FormSquid",
   description: "Prompt once and get a live hosted form, shadcn/ui source, validation, and a submissions inbox.",
 };

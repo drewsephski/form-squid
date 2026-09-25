@@ -40,7 +40,7 @@ const conditional = formSpecSchema.parse({
 describe("exported form acceptance", () => {
   test("installs registry files that typecheck", () => {
     const submitUrl = "https://formsquid.com/api/submit/business";
-    const compiled = compileForm(conditional, submitUrl);
+    const compiled = compileForm(conditional, { submission: "formsquid", url: submitUrl });
     const registry = {
       $schema: "https://ui.shadcn.com/schema/registry-item.json",
       name: "business",

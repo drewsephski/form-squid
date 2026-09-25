@@ -172,7 +172,7 @@ function loadSchema(source: string) {
 
 function expectParity(form: FormSpec, payload: unknown) {
   const runtime = validateSubmission(form, payload);
-  const parsed = loadSchema(compileForm(form, submitUrl).schemaSource).submissionSchema.safeParse(payload);
+  const parsed = loadSchema(compileForm(form, { submission: "formsquid", url: submitUrl }).schemaSource).submissionSchema.safeParse(payload);
   expect(parsed.success).toBe(runtime.ok);
   if (runtime.ok && parsed.success) {
     expect(parsed.data).toEqual(runtime.data);
@@ -354,7 +354,7 @@ describe("form hosts", () => {
 
 describe("compiler", () => {
   test("parses generated source", () => {
-    const compiled = compileForm(hostile, submitUrl);
+    const compiled = compileForm(hostile, { submission: "formsquid", url: submitUrl });
     for (const [fileName, source] of [
       ["schema.ts", compiled.schemaSource],
       ["form.tsx", compiled.formSource],
@@ -374,14 +374,14 @@ describe("compiler", () => {
   });
 
   test("keeps hostile strings inside the generated source", () => {
-    const compiled = compileForm(hostile, submitUrl);
+    const compiled = compileForm(hostile, { submission: "formsquid", url: submitUrl });
     expect(compiled.formSource).toContain(JSON.stringify('"); alert("xss'));
     expect(compiled.formSource).toContain(JSON.stringify("back`tick\nnewline"));
     expect(compiled.schemaSource).toContain(JSON.stringify('"); alert("xss'));
   });
 
   test("subscribes exported conditions with useWatch and clears empty numbers", () => {
-    const source = compileForm(conditional, submitUrl).formSource;
+    const source = compileForm(conditional, { submission: "formsquid", url: submitUrl }).formSource;
     expect(source).toContain("useWatch");
     expect(source).toContain("conditionMet(spec, watched ?? {}, field)");
     expect(source).not.toContain("conditionMet(spec, form.getValues()");

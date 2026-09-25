@@ -14,6 +14,9 @@ export async function SiteHeader() {
         <Link href="/templates" className="transition-colors duration-300 hover:text-foreground">
           Templates
         </Link>
+        <Link href="/shadcn/form-builder" className="transition-colors duration-300 hover:text-foreground">
+          shadcn
+        </Link>
         {session?.user ? (
           <>
             <Link href="/forms" className="transition-colors duration-300 hover:text-foreground">

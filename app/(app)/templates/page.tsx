@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { pageMetadata } from "@/app/lib/seo";
 import { templates } from "@/app/lib/templates";
 import { FormMiniPreview } from "@/app/ui/form-mini-preview";
 
-export const metadata: Metadata = {
-  title: "Templates · FormSquid",
-  description: "Start from a curated form, then host it or export the shadcn source.",
-};
+export const metadata: Metadata = pageMetadata({
+  title: "Form Templates | FormSquid",
+  description:
+    "Free form templates you can preview and publish. Start from client intake, job applications, waitlists, contact, RSVP, and feedback.",
+  path: "/templates",
+});
 
 export default function TemplatesPage() {
   return (
@@ -14,6 +17,11 @@ export default function TemplatesPage() {
       <div className="mb-8 space-y-2">
         <h1 className="font-heading text-4xl font-medium tracking-tight">Templates</h1>
         <p className="max-w-xl text-muted-foreground">Working forms you can preview, save, and customize.</p>
+        <p className="text-sm text-muted-foreground">
+          <Link href="/shadcn/form-builder" className="underline-offset-4 hover:underline">
+            Looking for the React source?
+          </Link>
+        </p>
       </div>
       <ul className="grid gap-4 sm:grid-cols-2">
         {templates.map((template) => (

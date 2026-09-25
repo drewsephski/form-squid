@@ -71,8 +71,67 @@ ${stepEntries}
 `;
 }
 
-function formSource(spec: FormSpec, submitUrl: string): string {
+export type CompileTarget =
+  | { submission: "formsquid"; url: string }
+  | { submission: "callback" };
+
+function formSource(spec: FormSpec, target: CompileTarget): string {
   const appearance = resolveAppearance(spec);
+  const hosted = target.submission === "formsquid";
+  const submitBinding = hosted ? `const submitUrl = ${JSON.stringify(target.url)};\n` : "";
+  const componentSignature = hosted
+    ? "export function ExportedForm() {"
+    : `export function ExportedForm({
+  onSubmit,
+}: {
+  onSubmit: (data: Record<string, unknown>) => void | Promise<void>;
+}) {`;
+  const honeypotState = hosted ? `  const [honeypot, setHoneypot] = useState("");\n` : "";
+  const submitHandler = hosted
+    ? `  async function handleSubmit(values: unknown) {
+    setSubmitError("");
+    if (honeypot) {
+      setDone(true);
+      return;
+    }
+    try {
+      const response = await fetch(submitUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...((values as Record<string, unknown>) ?? {}), _gotcha: honeypot }),
+      });
+      if (response.ok) {
+        setDone(true);
+        return;
+      }
+      const body = await response.json().catch(() => null);
+      const message = body && typeof body === "object" && "error" in body && typeof body.error === "string" ? body.error : "Could not submit. Try again.";
+      setSubmitError(message);
+    } catch {
+      setSubmitError("Could not submit. Try again.");
+    }
+  }`
+    : `  async function handleSubmit(values: unknown) {
+    setSubmitError("");
+    try {
+      await onSubmit(((values as Record<string, unknown>) ?? {}));
+      setDone(true);
+    } catch (error) {
+      const message = error instanceof Error && error.message ? error.message : "Could not submit. Try again.";
+      setSubmitError(message);
+    }
+  }`;
+  const honeypotField = hosted
+    ? `        <input
+          className="hidden"
+          tabIndex={-1}
+          autoComplete="off"
+          aria-hidden="true"
+          value={honeypot}
+          onChange={(event) => setHoneypot(event.target.value)}
+        />
+`
+    : "";
   return `"use client";
 
 import { useState } from "react";
@@ -115,8 +174,7 @@ const spec = ${JSON.stringify(spec, null, 2)} as {
     }>;
   }>;
 };
-const submitUrl = ${JSON.stringify(submitUrl)};
-const appearanceClassName = ${JSON.stringify(appearanceClassName(appearance))};
+${submitBinding}const appearanceClassName = ${JSON.stringify(appearanceClassName(appearance))};
 const appearanceStyle = ${JSON.stringify(appearanceStyle(appearance))};
 const submitClassName = ${JSON.stringify(submitClassName(appearance))};
 const appearanceTheme = ${JSON.stringify(appearance.theme)};
@@ -129,11 +187,10 @@ function parseNumberInput(raw: string): number | undefined {
   return Number.isFinite(value) ? value : undefined;
 }
 
-export function ExportedForm() {
+${componentSignature}
   const [stepIndex, setStepIndex] = useState(0);
   const [done, setDone] = useState(false);
-  const [honeypot, setHoneypot] = useState("");
-  const [submitError, setSubmitError] = useState("");
+${honeypotState}  const [submitError, setSubmitError] = useState("");
   const form = useForm({
     resolver: zodResolver(submissionSchema),
     defaultValues: {},
@@ -156,29 +213,7 @@ export function ExportedForm() {
     setStepIndex((current: number) => current + 1);
   }
 
-  async function handleSubmit(values: unknown) {
-    setSubmitError("");
-    if (honeypot) {
-      setDone(true);
-      return;
-    }
-    try {
-      const response = await fetch(submitUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...((values as Record<string, unknown>) ?? {}), _gotcha: honeypot }),
-      });
-      if (response.ok) {
-        setDone(true);
-        return;
-      }
-      const body = await response.json().catch(() => null);
-      const message = body && typeof body === "object" && "error" in body && typeof body.error === "string" ? body.error : "Could not submit. Try again.";
-      setSubmitError(message);
-    } catch {
-      setSubmitError("Could not submit. Try again.");
-    }
-  }
+${submitHandler}
 
   if (done) {
     return (
@@ -216,15 +251,7 @@ export function ExportedForm() {
             />
           );
         })}
-        <input
-          className="hidden"
-          tabIndex={-1}
-          autoComplete="off"
-          aria-hidden="true"
-          value={honeypot}
-          onChange={(event) => setHoneypot(event.target.value)}
-        />
-        <div className="flex gap-2">
+${honeypotField}        <div className="flex gap-2">
           {stepIndex > 0 ? (
             <Button type="button" variant="outline" onClick={() => setStepIndex((current: number) => current - 1)}>
               Back
@@ -312,11 +339,11 @@ function renderControl(field: (typeof spec.steps)[number]["fields"][number], con
 `;
 }
 
-export function compileForm(input: FormSpec, submitUrl: string): CompiledForm {
+export function compileForm(input: FormSpec, target: CompileTarget): CompiledForm {
   const spec = formSpecSchema.parse(input);
   return {
     schemaSource: schemaSource(spec),
-    formSource: formSource(spec, submitUrl),
+    formSource: formSource(spec, target),
     registryDependencies: registryDependencies(),
   };
 }

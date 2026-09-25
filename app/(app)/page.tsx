@@ -1,5 +1,14 @@
+import Link from "next/link";
+import type { Metadata } from "next";
 import { Generator } from "@/app/ui/generator";
 import { TemplateSection } from "@/app/ui/template-section";
+import { pageMetadata } from "@/app/lib/seo";
+
+export const metadata: Metadata = pageMetadata({
+  title: "FormSquid",
+  description: "Prompt once and get a live hosted form, shadcn/ui source, validation, and a submissions inbox.",
+  path: "/",
+});
 
 export default function Home() {
   return (
@@ -12,6 +21,11 @@ export default function Home() {
           </h1>
           <p className="mx-auto max-w-xl text-lg text-muted-foreground">
             Prompt once and get a live hosted form, shadcn/ui source, validation, and a submissions inbox.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            <Link href="/shadcn/form-builder" className="underline-offset-4 hover:underline">
+              Browse shadcn form examples
+            </Link>
           </p>
         </div>
         <Generator />

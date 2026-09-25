@@ -18,10 +18,26 @@ describe("templates", () => {
     if (!template) {
       throw new Error("Missing template");
     }
-    const compiled = compileForm(template.spec, "https://formsquid.com/api/submit/new-address");
+    const compiled = compileForm(template.spec, {
+      submission: "formsquid",
+      url: "https://formsquid.com/api/submit/new-address",
+    });
     const appearance = resolveAppearance(template.spec);
     expect(compiled.formSource).toContain("https://formsquid.com/api/submit/new-address");
     expect(compiled.formSource).toContain(appearance.theme);
     expect(compiled.formSource).toContain(appearance.accent === "violet" ? "oklch(0.702 0.183 293.541)" : "max-w-");
+  });
+
+  test("callback export calls onSubmit and does not embed a FormSquid URL", () => {
+    const template = templates[0];
+    if (!template) {
+      throw new Error("Missing template");
+    }
+    const compiled = compileForm(template.spec, { submission: "callback" });
+    expect(compiled.formSource).toContain("onSubmit");
+    expect(compiled.formSource).toContain("await onSubmit(");
+    expect(compiled.formSource).not.toContain("submitUrl");
+    expect(compiled.formSource).not.toContain("fetch(");
+    expect(compiled.schemaSource).toContain("submissionSchema");
   });
 });

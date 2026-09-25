@@ -6,5 +6,5 @@ import { submitUrlFor } from "@/app/lib/origin";
 
 export async function compileAction(input: unknown, slug: string) {
   const spec = formSpecSchema.parse(input);
-  return compileForm(spec, submitUrlFor(slug));
+  return compileForm(spec, { submission: "formsquid", url: submitUrlFor(slug) });
 }
