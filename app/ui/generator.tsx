@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { flushSync } from "react-dom";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +14,28 @@ import { promptPresets } from "@/app/lib/prompt-presets";
 import { FormView } from "@/app/ui/form-view";
 import { authClient } from "@/lib/auth-client";
 
+function prefersReducedMotion() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function GeneratingMark() {
+  return (
+    <div className="flex aspect-video w-full items-center justify-center bg-black" aria-hidden="true">
+      <div className="loader generate-loader">
+        <div className="box">
+          <div className="logo">
+            <Image src="/squid.png" alt="" width={94} height={94} />
+          </div>
+        </div>
+        <div className="box" />
+        <div className="box" />
+        <div className="box" />
+        <div className="box" />
+      </div>
+    </div>
+  );
+}
+
 export function Generator() {
   const router = useRouter();
   const [prompt, setPrompt] = useState("");
@@ -19,10 +43,15 @@ export function Generator() {
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [saving, setSaving] = useState(false);
+  const stageRef = useRef<HTMLDivElement>(null);
 
   async function handleGenerate() {
-    setPending(true);
-    setError("");
+    const reduceMotion = prefersReducedMotion();
+    flushSync(() => {
+      setPending(true);
+      setError("");
+    });
+    stageRef.current?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
     trackFunnel("generation_started", { page: "/" });
     const result = await generateAction(prompt);
     setPending(false);
@@ -93,21 +122,30 @@ export function Generator() {
         </div>
       </div>
       {error ? <p className="text-center text-sm text-destructive">{error}</p> : null}
-      <div className="rounded-[2rem] bg-foreground/5 p-1.5">
-        <div className="rounded-[calc(2rem-0.375rem)] bg-card p-6">
-          {spec ? (
-            <div className="space-y-6">
-              <FormView spec={spec} preview />
-              <Button type="button" variant="outline" className="h-11 w-full rounded-full" onClick={() => void handleSave()} disabled={saving}>
-                {saving ? "Saving" : "Save & customize"}
-              </Button>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center text-center text-muted-foreground">
-              <p>Describe your form above</p>
-            </div>
-          )}
-        </div>
+      <div ref={stageRef} className="rounded-[2rem] bg-foreground/5 p-1.5">
+        {pending ? (
+          <div className="animate-in fade-in overflow-hidden rounded-[calc(2rem-0.375rem)] bg-black duration-300">
+            <GeneratingMark />
+            <p className="sr-only" role="status">
+              Generating your form
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-[calc(2rem-0.375rem)] bg-card p-6">
+            {spec ? (
+              <div className="animate-in fade-in slide-in-from-bottom-2 space-y-6 duration-500">
+                <FormView spec={spec} preview />
+                <Button type="button" variant="outline" className="h-11 w-full rounded-full" onClick={() => void handleSave()} disabled={saving}>
+                  {saving ? "Saving" : "Save & customize"}
+                </Button>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center text-center text-muted-foreground">
+                <p>Describe your form above</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
