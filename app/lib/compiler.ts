@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import ts from "typescript";
-import { appearanceClassName, appearanceStyle, resolveAppearance, submitClassName } from "./appearance";
+import { appearanceClassName, appearanceStyle, resolveAppearance, submitClassName, submitSlotClassName } from "./appearance";
 import { formSpecSchema, type FormSpec } from "./definitions";
 
 export type CompiledForm = {
@@ -181,6 +181,7 @@ const spec = ${JSON.stringify(spec, null, 2)} as {
 ${submitBinding}const appearanceClassName = ${JSON.stringify(appearanceClassName(appearance))};
 const appearanceStyle = ${JSON.stringify(appearanceStyle(appearance))};
 const submitClassName = ${JSON.stringify(submitClassName(appearance))};
+const submitSlotClassName = ${JSON.stringify(submitSlotClassName(appearance))};
 const appearanceTheme = ${JSON.stringify(appearance.theme)};
 
 function parseNumberInput(raw: string): number | undefined {
@@ -320,17 +321,19 @@ ${submitHandler}
         })}
 ${honeypotField}        <div className="flex gap-2">
           {stepIndex > 0 ? (
-            <Button type="button" variant="outline" onClick={() => setStepIndex((current: number) => current - 1)}>
+            <Button type="button" variant="outline" className="shrink-0" onClick={() => setStepIndex((current: number) => current - 1)}>
               Back
             </Button>
           ) : null}
-          {stepIndex < spec.steps.length - 1 ? (
-            <Button type="button" className={submitClassName} onClick={handleNext}>
-              Next
-            </Button>
-          ) : (
-            <Button type="submit" className={submitClassName}>{spec.submitLabel}</Button>
-          )}
+          <div className={submitSlotClassName}>
+            {stepIndex < spec.steps.length - 1 ? (
+              <Button type="button" className={submitClassName} onClick={handleNext}>
+                Next
+              </Button>
+            ) : (
+              <Button type="submit" className={submitClassName}>{spec.submitLabel}</Button>
+            )}
+          </div>
         </div>
         {submitError ? <p role="alert">{submitError}</p> : null}
       </form>

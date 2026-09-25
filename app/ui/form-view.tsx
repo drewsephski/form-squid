@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { appearanceClassName, appearanceStyle, resolveAppearance, submitClassName } from "@/app/lib/appearance";
+import { appearanceClassName, appearanceStyle, resolveAppearance, submitClassName, submitSlotClassName } from "@/app/lib/appearance";
 import { honeypotField, type FormField, type FormSpec, type SubmissionData } from "@/app/lib/definitions";
 import { parseNumberInput } from "@/app/lib/number-input";
 import { fieldIsVisible } from "@/app/lib/submission-algorithm";
@@ -35,6 +35,7 @@ export function FormView({ spec, submitUrl, preview = false }: FormViewProps) {
   const frameClass = appearanceClassName(appearance);
   const frameStyle = appearanceStyle(appearance);
   const actionClass = submitClassName(appearance);
+  const actionSlotClass = submitSlotClassName(appearance);
 
   if (!step) {
     return null;
@@ -198,13 +199,15 @@ export function FormView({ spec, submitUrl, preview = false }: FormViewProps) {
         />
         <div className="flex gap-2">
           {stepIndex > 0 ? (
-            <Button type="button" variant="outline" onClick={() => setStepIndex((current) => current - 1)}>
+            <Button type="button" variant="outline" className="shrink-0" onClick={() => setStepIndex((current) => current - 1)}>
               Back
             </Button>
           ) : null}
-          <Button type="submit" className={actionClass} disabled={pending}>
-            {pending ? "Sending…" : stepIndex < spec.steps.length - 1 ? "Next" : spec.submitLabel}
-          </Button>
+          <div className={actionSlotClass}>
+            <Button type="submit" className={actionClass} disabled={pending}>
+              {pending ? "Sending…" : stepIndex < spec.steps.length - 1 ? "Next" : spec.submitLabel}
+            </Button>
+          </div>
         </div>
         {submitError ? <p role="alert" className="text-sm text-destructive">{submitError}</p> : null}
       </form>

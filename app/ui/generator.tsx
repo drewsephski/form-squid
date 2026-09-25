@@ -22,7 +22,7 @@ function prefersReducedMotion() {
 
 function GeneratingMark() {
   return (
-    <div className="flex aspect-video w-full flex-col items-center justify-center gap-4" aria-hidden="true">
+    <div className="flex aspect-video w-full flex-col items-center justify-center gap-10" aria-hidden="true">
       <div className="loader generate-loader">
         <div className="box">
           <div className="logo">

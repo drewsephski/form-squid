@@ -112,3 +112,8 @@ export function appearanceClassName(appearance: Appearance) {
 export function submitClassName(appearance: Appearance) {
   return appearance.submitWidth === "full" ? "w-full" : "";
 }
+
+/** Slot around the primary action so full-width works beside Back. */
+export function submitSlotClassName(appearance: Appearance) {
+  return appearance.submitWidth === "full" ? "min-w-0 flex-1" : "";
+}
