@@ -306,7 +306,7 @@ export function Editor({ form }: { form: EditorForm }) {
           </form>
           <p className="text-sm text-muted-foreground">New submissions are emailed here. The inbox keeps a copy either way.</p>
           <Input aria-label="Search submissions" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={nextCursor ? "Search loaded responses" : "Search responses"} />
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-[minmax(14rem,20rem)_minmax(0,1fr)]">
             <div>
               {visibleSubmissions.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
@@ -321,9 +321,15 @@ export function Editor({ form }: { form: EditorForm }) {
                 {visibleSubmissions.map((row) => {
                   const version = form.versions.find((item) => item.id === row.formVersionId)?.spec ?? null;
                   const identity = submissionIdentity(version, row.payload);
+                  const isSelected = selected?.id === row.id;
                   return (
                     <li key={row.id}>
-                      <button type="button" className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => setSelectedId(row.id)}>
+                      <button
+                        type="button"
+                        aria-current={isSelected ? "true" : undefined}
+                        className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-muted ${isSelected ? "bg-muted" : ""}`}
+                        onClick={() => setSelectedId(row.id)}
+                      >
                         <span className="min-w-0">
                           <span className="block truncate font-medium">{identity.title}</span>
                           {identity.detail ? <span className="block truncate text-muted-foreground">{identity.detail}</span> : null}
@@ -352,39 +358,52 @@ export function Editor({ form }: { form: EditorForm }) {
               ) : null}
             </div>
             {selected ? (
-              <div className="space-y-4">
-                <div>
-                  <p className="font-medium">{submissionIdentity(selectedSpec, selected.payload).title}</p>
-                  <p className="text-sm text-muted-foreground">{formatResponseTime(selected.createdAt)}</p>
+              <div className="min-w-0 space-y-4">
+                <div className="flex flex-wrap items-end justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{submissionIdentity(selectedSpec, selected.payload).title}</p>
+                    <p className="text-sm text-muted-foreground">{formatResponseTime(selected.createdAt)}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        void exportSubmissionsCsv(form.id).then((csv) => {
+                          const blob = new Blob([csv], { type: "text/csv" });
+                          const url = URL.createObjectURL(blob);
+                          const link = document.createElement("a");
+                          link.href = url;
+                          link.download = `${sourceSlug}.csv`;
+                          link.click();
+                          URL.revokeObjectURL(url);
+                        }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not export submissions."));
+                      }}
+                    >
+                      Download CSV
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => void deleteSubmission(form.id, selected.id).then(() => router.refresh())}>Delete</Button>
+                  </div>
                 </div>
-                <dl className="space-y-3">
-                  {labeledAnswers(selectedSpec, selected.payload).map((answer) => (
-                    <div key={answer.id}>
-                      <dt className="text-sm text-muted-foreground">{answer.label}</dt>
-                      <dd>{answer.value}</dd>
-                    </div>
-                  ))}
+                <dl className="divide-y rounded-lg border">
+                  {labeledAnswers(selectedSpec, selected.payload).map((answer) => {
+                    const longAnswer = answer.value.length > 64 || answer.value.includes("\n");
+                    return (
+                      <div
+                        key={answer.id}
+                        className={
+                          longAnswer
+                            ? "space-y-1 px-3 py-2.5"
+                            : "grid gap-1 px-3 py-2.5 sm:grid-cols-[minmax(7rem,11rem)_minmax(0,1fr)] sm:items-baseline sm:gap-4"
+                        }
+                      >
+                        <dt className="text-sm text-muted-foreground">{answer.label}</dt>
+                        <dd className="min-w-0 break-words text-sm leading-snug whitespace-pre-wrap">{answer.value}</dd>
+                      </div>
+                    );
+                  })}
                 </dl>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      void exportSubmissionsCsv(form.id).then((csv) => {
-                        const blob = new Blob([csv], { type: "text/csv" });
-                        const url = URL.createObjectURL(blob);
-                        const link = document.createElement("a");
-                        link.href = url;
-                        link.download = `${sourceSlug}.csv`;
-                        link.click();
-                        URL.revokeObjectURL(url);
-                      }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not export submissions."));
-                    }}
-                  >
-                    Download CSV
-                  </Button>
-                  <Button type="button" variant="outline" onClick={() => void deleteSubmission(form.id, selected.id).then(() => router.refresh())}>Delete</Button>
-                </div>
               </div>
             ) : null}
           </div>
