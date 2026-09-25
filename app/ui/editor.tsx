@@ -199,7 +199,7 @@ export function Editor({ form }: { form: EditorForm }) {
             <Input aria-label="Notification email" type="email" value={notifyEmail} onChange={(event) => setNotifyEmail(event.target.value)} placeholder="Notifications are off until you add an email" />
             <Button type="submit" variant="outline">Save email</Button>
           </form>
-          <p className="text-sm text-muted-foreground">Email notifications send when RESEND_API_KEY is set. The inbox works either way.</p>
+          <p className="text-sm text-muted-foreground">New submissions are emailed here. The inbox keeps a copy either way.</p>
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">

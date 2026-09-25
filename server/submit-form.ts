@@ -12,6 +12,7 @@ import {
 import { validateSubmission } from "../app/lib/validate-submission";
 import * as schema from "../db/schema";
 import { formVersions, forms, submissions } from "../db/schema";
+import { senderAddress } from "./mail";
 import { reserveSubmissionAttempt } from "./rate-limit";
 import type { SubmissionEvent } from "./submission-log";
 
@@ -130,15 +131,17 @@ export async function submitForm(
   });
 
   if (process.env.RESEND_API_KEY && form.notifyEmail) {
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    await resend.emails
-      .send({
-        from: process.env.RESEND_FROM ?? "FormSquid <onboarding@resend.dev>",
+    try {
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      await resend.emails.send({
+        from: senderAddress("RESEND_FROM"),
         to: form.notifyEmail,
         subject: `New submission for ${input.slug}`,
         text: JSON.stringify(result.data, null, 2),
-      })
-      .catch(() => undefined);
+      });
+    } catch (error) {
+      console.error("submission notification failed", error);
+    }
   }
 
   return respond(200, { ok: true }, "submission.accepted", "stored", form.id);

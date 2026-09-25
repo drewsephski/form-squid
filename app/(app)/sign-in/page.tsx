@@ -8,6 +8,9 @@ export default function SignInPage() {
         <h1 className="font-heading text-4xl font-medium">Sign in</h1>
         <AuthForm mode="sign-in" />
         <p className="text-sm text-muted-foreground">
+          <Link href="/forgot-password">Forgot password?</Link>
+        </p>
+        <p className="text-sm text-muted-foreground">
           New here? <Link href="/sign-up">Create an account</Link>
         </p>
       </div>

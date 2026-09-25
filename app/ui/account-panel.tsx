@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { ChangePasswordForm } from "@/app/ui/change-password-form";
 import { authClient } from "@/lib/auth-client";
 
 export function AccountPanel({ email }: { email: string }) {
@@ -19,6 +20,7 @@ export function AccountPanel({ email }: { email: string }) {
         <h1 className="font-heading text-4xl font-medium">Account</h1>
         <p className="text-muted-foreground">{email}</p>
       </div>
+      <ChangePasswordForm />
       <Button type="button" variant="outline" onClick={() => void handleSignOut()}>
         Sign out
       </Button>
