@@ -22,33 +22,7 @@ interface AnimateHeightProps {
 function AnimateHeight({ className, children }: AnimateHeightProps) {
   const nested = React.useContext(AnimateHeightContext)
   const reduceMotion = useReducedMotion()
-  const measureRef = React.useRef<HTMLDivElement>(null)
-  const [height, setHeight] = React.useState<number | "auto">("auto")
   const shouldAnimate = !nested && !reduceMotion
-
-  React.useLayoutEffect(() => {
-    if (!shouldAnimate) {
-      setHeight("auto")
-      return
-    }
-
-    const measured = measureRef.current
-    if (!measured) {
-      return
-    }
-
-    function sync(element: HTMLDivElement) {
-      // offsetHeight is layout size; getBoundingClientRect shrinks under CSS scale
-      // and would clip scaled previews (e.g. FormMiniPreview).
-      const next = element.offsetHeight
-      setHeight((current) => (current === next ? current : next))
-    }
-
-    sync(measured)
-    const observer = new ResizeObserver(() => sync(measured))
-    observer.observe(measured)
-    return () => observer.disconnect()
-  }, [shouldAnimate])
 
   if (!shouldAnimate) {
     return <div className={className}>{children}</div>
@@ -56,15 +30,40 @@ function AnimateHeight({ className, children }: AnimateHeightProps) {
 
   return (
     <AnimateHeightContext.Provider value={true}>
-      <motion.div
-        className={cn("overflow-hidden", className)}
-        initial={false}
-        animate={{ height }}
-        transition={{ height: heightTransition }}
-      >
-        <div ref={measureRef}>{children}</div>
-      </motion.div>
+      <AnimatedHeight className={className}>{children}</AnimatedHeight>
     </AnimateHeightContext.Provider>
+  )
+}
+
+function AnimatedHeight({ className, children }: AnimateHeightProps) {
+  const measureRef = React.useRef<HTMLDivElement>(null)
+  const [height, setHeight] = React.useState<number | "auto">("auto")
+
+  React.useLayoutEffect(() => {
+    const measured = measureRef.current
+    if (!measured) {
+      return
+    }
+
+    const observer = new ResizeObserver(() => {
+      // offsetHeight is layout size; getBoundingClientRect shrinks under CSS scale
+      // and would clip scaled previews (e.g. FormMiniPreview).
+      const next = measured.offsetHeight
+      setHeight((current) => (current === next ? current : next))
+    })
+    observer.observe(measured)
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <motion.div
+      className={cn("overflow-hidden", className)}
+      initial={false}
+      animate={{ height }}
+      transition={{ height: heightTransition }}
+    >
+      <div ref={measureRef}>{children}</div>
+    </motion.div>
   )
 }
 

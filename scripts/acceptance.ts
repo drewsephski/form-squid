@@ -322,6 +322,10 @@ async function main() {
   if (!draftSlug) {
     await run("psql", [direct, "-v", "ON_ERROR_STOP=1", "-f", path.join(root, "db/migrations/0002_draft_slug.sql")]);
   }
+  const formWebhooks = (await run("psql", [direct, "-t", "-A", "-c", "select to_regclass('public.form_webhooks')"])).trim();
+  if (!formWebhooks) {
+    await run("psql", [direct, "-v", "ON_ERROR_STOP=1", "-f", path.join(root, "db/migrations/0003_fantastic_edwin_jarvis.sql")]);
+  }
 
   const functionOrigin = await deployFunction();
   const formsquidPort = await freePort();

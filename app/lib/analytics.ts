@@ -13,6 +13,8 @@ export const funnelEvents = [
   "signup_completed",
   "form_created",
   "form_published",
+  "webhook_connected",
+  "webhook_tested",
 ] as const;
 
 export type FunnelEvent = (typeof funnelEvents)[number];

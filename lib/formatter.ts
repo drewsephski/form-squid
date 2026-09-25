@@ -65,3 +65,21 @@ export function formatPublished(value: string, now = Date.now()) {
   }
   return `Published ${formatResponseTime(value)}`;
 }
+
+export function formatRelativeAgo(value: string, now = Date.now()) {
+  const delta = Math.max(0, now - new Date(value).getTime());
+  const seconds = Math.round(delta / 1000);
+  if (seconds < 60) {
+    return `${Math.max(seconds, 1)}s ago`;
+  }
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) {
+    return `${minutes}m ago`;
+  }
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) {
+    return `${hours}h ago`;
+  }
+  const days = Math.round(hours / 24);
+  return `${days}d ago`;
+}

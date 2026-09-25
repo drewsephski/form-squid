@@ -14,6 +14,8 @@ describe("funnel analytics", () => {
       "signup_completed",
       "form_created",
       "form_published",
+      "webhook_connected",
+      "webhook_tested",
     ]);
     expect(
       funnelProperties({

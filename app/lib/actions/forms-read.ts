@@ -2,10 +2,12 @@
 
 import { and, count, desc, eq, inArray, lt, or } from "drizzle-orm";
 import { db } from "@/db";
-import { formVersions, forms, submissions } from "@/db/schema";
+import { formVersions, formWebhooks, forms, submissions } from "@/db/schema";
 import { formSpecSchema } from "@/app/lib/definitions";
 import { hostedHost } from "@/app/lib/origin";
 import { requireFormOwner, requireUser } from "@/app/lib/auth-guards";
+import { listRecentDeliveries } from "@/server/webhooks/deliver";
+import { maskWebhookSecret } from "@/server/webhooks/sign";
 
 const pageSize = 50;
 
@@ -106,6 +108,8 @@ export async function getForm(formId: string) {
   const page = await pageSubmissions(formId);
   const published = versions.find((version) => version.id === form.currentPublishedVersionId);
   const publishedSpec = published ? formSpecSchema.safeParse(published.spec) : null;
+  const [webhook] = await db.select().from(formWebhooks).where(eq(formWebhooks.formId, formId));
+  const deliveries = webhook ? await listRecentDeliveries(db, webhook.id) : [];
 
   return {
     id: form.id,
@@ -128,6 +132,27 @@ export async function getForm(formId: string) {
     }),
     submissions: page.submissions,
     nextCursor: page.nextCursor,
+    webhook: webhook
+      ? {
+          id: webhook.id,
+          url: webhook.url,
+          enabled: webhook.enabled,
+          secret: webhook.secret,
+          secretMasked: maskWebhookSecret(webhook.secret),
+          createdAt: webhook.createdAt.toISOString(),
+          updatedAt: webhook.updatedAt.toISOString(),
+          deliveries: deliveries.map((row) => ({
+            id: row.id,
+            submissionId: row.submissionId,
+            attempt: row.attempt,
+            status: row.status,
+            responseStatus: row.responseStatus,
+            error: row.error,
+            createdAt: row.createdAt.toISOString(),
+            deliveredAt: row.deliveredAt?.toISOString() ?? null,
+          })),
+        }
+      : null,
   };
 }
 

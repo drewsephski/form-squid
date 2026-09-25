@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
+import { waitUntil } from "@neon/functions";
 import { Hono } from "hono";
 import { db } from "../db/function";
 import { clientAddress, hashClientAddress, requireRateLimitSalt } from "../server/rate-limit";
 import { submissionLog } from "../server/submission-log";
 import { submitForm } from "../server/submit-form";
+import { deliverSubmissionWebhook } from "../server/webhooks/deliver";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -70,6 +72,13 @@ app.post("/forms/:slug/submissions", async (c) => {
         reason: result.reason,
       }),
     );
+    if (result.dispatch) {
+      waitUntil(
+        deliverSubmissionWebhook(db, result.dispatch).catch((error: unknown) => {
+          console.error("webhook delivery failed", error instanceof Error ? error.message : "unknown");
+        }),
+      );
+    }
     if (result.retryAfter) headers["Retry-After"] = String(result.retryAfter);
     return c.json(result.body, result.status, headers);
   } catch {

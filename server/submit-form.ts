@@ -17,6 +17,7 @@ import { formVersions, forms, submissions } from "../db/schema";
 import { senderAddress, submissionNotificationEmail } from "./mail";
 import { reserveSubmissionAttempt } from "./rate-limit";
 import type { SubmissionEvent } from "./submission-log";
+import type { SubmissionDispatch } from "./webhooks/payload";
 
 export type SubmitDatabase = NodePgDatabase<typeof schema>;
 
@@ -32,6 +33,7 @@ export type SubmitResponse = {
   formId: string | null;
   reason: string;
   retryAfter?: number;
+  dispatch?: SubmissionDispatch;
 };
 
 function respond(
@@ -125,11 +127,13 @@ export async function submitForm(
     return respond(400, { ok: false, errors: result.errors }, "submission.invalid", "validation", form.id);
   }
 
+  const submissionId = randomUUID();
   await database.insert(submissions).values({
-    id: randomUUID(),
+    id: submissionId,
     formId: form.id,
     formVersionId: version.id,
     payload: result.data,
+    createdAt: now,
   });
 
   if (process.env.RESEND_API_KEY && form.notifyEmail) {
@@ -152,5 +156,16 @@ export async function submitForm(
     }
   }
 
-  return respond(200, { ok: true }, "submission.accepted", "stored", form.id);
+  return {
+    ...respond(200, { ok: true }, "submission.accepted", "stored", form.id),
+    dispatch: {
+      submissionId,
+      formId: form.id,
+      formSlug: form.slug,
+      formTitle: spec.title || form.slug,
+      version: version.versionNumber,
+      createdAt: now.toISOString(),
+      data: result.data,
+    },
+  };
 }

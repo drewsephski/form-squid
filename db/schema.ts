@@ -1,4 +1,14 @@
-import { index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 import { user } from "./auth-schema";
 
 export * from "./auth-schema";
@@ -86,4 +96,41 @@ export const generationEvents = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [index("generation_events_actor_idx").on(table.actorKey, table.createdAt)],
+);
+
+export const formWebhooks = pgTable(
+  "form_webhooks",
+  {
+    id: text("id").primaryKey(),
+    formId: text("form_id")
+      .notNull()
+      .references(() => forms.id, { onDelete: "cascade" }),
+    url: text("url").notNull(),
+    secret: text("secret").notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("form_webhooks_form_id_unique").on(table.formId)],
+);
+
+export const webhookDeliveries = pgTable(
+  "webhook_deliveries",
+  {
+    id: text("id").primaryKey(),
+    webhookId: text("webhook_id")
+      .notNull()
+      .references(() => formWebhooks.id, { onDelete: "cascade" }),
+    submissionId: text("submission_id").references(() => submissions.id, { onDelete: "cascade" }),
+    attempt: integer("attempt").notNull().default(0),
+    status: text("status").notNull(),
+    responseStatus: integer("response_status"),
+    error: text("error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("webhook_deliveries_webhook_created_idx").on(table.webhookId, table.createdAt),
+    index("webhook_deliveries_submission_idx").on(table.submissionId),
+  ],
 );

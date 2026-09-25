@@ -24,6 +24,7 @@ import { AnimateHeight } from "@/components/ui/animate-height";
 import { AppearanceSettings } from "@/app/ui/appearance-settings";
 import { FieldsInspector, FormSettings } from "@/app/ui/editor-inspector";
 import { FormView } from "@/app/ui/form-view";
+import { IntegrationsPanel } from "@/app/ui/integrations-panel";
 
 interface EditorForm {
   id: string;
@@ -38,6 +39,25 @@ interface EditorForm {
   versions: Array<{ id: string; versionNumber: number; createdAt: string; spec: FormSpec | null }>;
   submissions: Array<{ id: string; formVersionId: string; payload: unknown; createdAt: string }>;
   nextCursor: string | null;
+  webhook: {
+    id: string;
+    url: string;
+    enabled: boolean;
+    secret: string;
+    secretMasked: string;
+    createdAt: string;
+    updatedAt: string;
+    deliveries: Array<{
+      id: string;
+      submissionId: string | null;
+      attempt: number;
+      status: string;
+      responseStatus: number | null;
+      error: string | null;
+      createdAt: string;
+      deliveredAt: string | null;
+    }>;
+  } | null;
 }
 
 function liveHref(slug: string) {
@@ -291,6 +311,7 @@ export function Editor({ form }: { form: EditorForm }) {
       <Tabs defaultValue="submissions" className="min-w-0">
         <TabsList>
           <TabsTrigger value="submissions">Submissions</TabsTrigger>
+          <TabsTrigger value="integrations">Integrations</TabsTrigger>
           <TabsTrigger value="code">Code</TabsTrigger>
         </TabsList>
         <TabsContent value="submissions" className="min-w-0 space-y-4">
@@ -453,6 +474,9 @@ export function Editor({ form }: { form: EditorForm }) {
               </AnimateHeight>
             </div>
           ) : null}
+        </TabsContent>
+        <TabsContent value="integrations" className="min-w-0">
+          <IntegrationsPanel formId={form.id} initialWebhook={form.webhook} />
         </TabsContent>
         <TabsContent value="code" className="min-w-0 space-y-4">
           <div className="min-w-0 space-y-2">
