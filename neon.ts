@@ -12,6 +12,9 @@ if (process.env.RATE_LIMIT_IP_SALT) {
 }
 
 export default defineConfig({
+  buckets: {
+    "submission-uploads": {},
+  },
   functions: {
     api: {
       name: "FormSquid API",

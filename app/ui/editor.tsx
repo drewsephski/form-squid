@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { generateAction } from "@/app/lib/actions/generate";
 import { exportSubmissionsCsv, loadSubmissions } from "@/app/lib/actions/forms-read";
+import { createSubmissionFileDownload } from "@/app/lib/actions/files";
 import { publishForm, restoreVersion, updateDraft, updateNotifyEmail } from "@/app/lib/actions/forms-write";
 import { trackFunnel } from "@/app/lib/analytics";
 import { deleteSubmission } from "@/app/lib/actions/submissions-write";
@@ -16,8 +17,9 @@ import { compileAction } from "@/app/lib/actions/compile";
 import { describeSpecChange } from "@/app/lib/diff-spec";
 import { type FormSpec } from "@/app/lib/definitions";
 import { specIssue, specsMatch } from "@/app/lib/edit-spec";
+import { formatFileSize } from "@/app/lib/file-field";
 import { appOrigin, hostedHost, hostedUrl } from "@/app/lib/origin";
-import { labeledAnswers, submissionIdentity, submissionSearchText } from "@/app/lib/submission-display";
+import { fileRefsFromValue, labeledAnswers, submissionIdentity, submissionSearchText } from "@/app/lib/submission-display";
 import { formatPublished, formatResponseTime } from "@/lib/formatter";
 import { CodeBlock } from "@/components/ui/code-block";
 import { AnimateHeight } from "@/components/ui/animate-height";
@@ -419,7 +421,9 @@ export function Editor({ form }: { form: EditorForm }) {
                 </div>
                 <dl className="divide-y rounded-lg border">
                   {labeledAnswers(selectedSpec, selected.payload).map((answer) => {
-                    const longAnswer = answer.value.length > 64 || answer.value.includes("\n");
+                    const field = selectedSpec?.steps.flatMap((step) => step.fields).find((item) => item.id === answer.id);
+                    const files = field?.type === "file" ? fileRefsFromValue((selected.payload as Record<string, unknown>)?.[answer.id]) : [];
+                    const longAnswer = answer.value.length > 64 || answer.value.includes("\n") || files.length > 0;
                     return (
                       <div
                         key={answer.id}
@@ -430,7 +434,37 @@ export function Editor({ form }: { form: EditorForm }) {
                         }
                       >
                         <dt className="text-sm text-muted-foreground">{answer.label}</dt>
-                        <dd className="min-w-0 break-words text-sm leading-snug whitespace-pre-wrap">{answer.value}</dd>
+                        <dd className="min-w-0 break-words text-sm leading-snug whitespace-pre-wrap">
+                          {files.length > 0 ? (
+                            <ul className="space-y-2">
+                              {files.map((file) => (
+                                <li key={file.id} className="flex flex-wrap items-center gap-2">
+                                  <span>
+                                    {file.name} · {formatFileSize(file.size)}
+                                  </span>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      void createSubmissionFileDownload(form.id, file.id)
+                                        .then((result) => {
+                                          window.open(result.url, "_blank", "noopener,noreferrer");
+                                        })
+                                        .catch((error: unknown) =>
+                                          toast.error(error instanceof Error ? error.message : "Could not download file."),
+                                        );
+                                    }}
+                                  >
+                                    Download
+                                  </Button>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            answer.value
+                          )}
+                        </dd>
                       </div>
                     );
                   })}

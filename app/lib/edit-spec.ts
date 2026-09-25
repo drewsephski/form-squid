@@ -9,6 +9,7 @@ export const fieldTypeLabels: Record<FieldType, string> = {
   radio: "Radio",
   checkbox: "Checkbox",
   date: "Date",
+  file: "File",
 };
 
 const maxFields = 40;
@@ -90,6 +91,10 @@ export function blankField(type: FieldType, taken: Set<string>): FormField {
   if (choiceType(type)) {
     field.options = [{ value: "option_1", label: "Option 1" }];
   }
+  if (type === "file") {
+    field.maxFiles = 1;
+    field.maxFileSizeMb = 10;
+  }
   return field;
 }
 
@@ -137,19 +142,59 @@ export function changeFieldType(spec: FormSpec, fieldId: string, type: FieldType
         if (field.id !== fieldId) {
           return field;
         }
-        if (!choiceType(type)) {
-          const next = { ...field, type };
+        if (type === "file") {
+          const next: FormField = {
+            ...field,
+            type,
+            maxFiles: field.maxFiles === 5 ? 5 : 1,
+            maxFileSizeMb: field.maxFileSizeMb ?? 10,
+          };
           delete next.options;
           return next;
         }
-        return {
+        if (!choiceType(type)) {
+          const next = { ...field, type };
+          delete next.options;
+          delete next.maxFiles;
+          delete next.maxFileSizeMb;
+          delete next.accept;
+          return next;
+        }
+        const next: FormField = {
           ...field,
           type,
           options: field.options && field.options.length > 0 ? field.options : [{ value: "option_1", label: "Option 1" }],
         };
+        delete next.maxFiles;
+        delete next.maxFileSizeMb;
+        delete next.accept;
+        return next;
       }),
     })),
   });
+}
+
+export function updateFileField(
+  spec: FormSpec,
+  fieldId: string,
+  patch: Partial<Pick<FormField, "maxFiles" | "maxFileSizeMb" | "accept">>,
+) {
+  return {
+    ...spec,
+    steps: spec.steps.map((step) => ({
+      ...step,
+      fields: step.fields.map((field) => {
+        if (field.id !== fieldId || field.type !== "file") {
+          return field;
+        }
+        const next = { ...field, ...patch };
+        if (patch.accept === undefined && "accept" in patch) {
+          delete next.accept;
+        }
+        return next;
+      }),
+    })),
+  };
 }
 
 function conditionValueOk(parent: FormField, equals: string) {

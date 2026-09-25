@@ -21,6 +21,7 @@ describe("templates", () => {
     const compiled = compileForm(template.spec, {
       submission: "formsquid",
       url: "https://formsquid.com/api/submit/new-address",
+      uploadUrl: "https://formsquid.com/api/upload/new-address",
     });
     const appearance = resolveAppearance(template.spec);
     expect(compiled.formSource).toContain("https://formsquid.com/api/submit/new-address");

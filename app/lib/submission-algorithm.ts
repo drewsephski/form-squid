@@ -2,9 +2,17 @@ import type {
   FormField,
   FormSpec,
   SubmissionData,
+  SubmissionFileRef,
   SubmissionResult,
   SubmissionValue,
 } from "./definitions";
+import {
+  fileFieldSettings,
+  isBrowserFileLike,
+  isSubmissionFileRef,
+  isUploadId,
+  mimeAllowed,
+} from "./file-field";
 
 function fieldsInOrder(spec: FormSpec): FormField[] {
   return spec.steps.flatMap((step) => step.fields);
@@ -69,7 +77,82 @@ function isVisible(
   return visible;
 }
 
+function fileItems(value: unknown): unknown[] {
+  if (value === undefined || value === null || value === "") {
+    return [];
+  }
+  return Array.isArray(value) ? value : [value];
+}
+
+function fileTypeError(field: FormField, value: unknown): string | null {
+  const settings = fileFieldSettings(field);
+  const items = fileItems(value);
+
+  if (items.length === 0) {
+    return field.required ? "This field is required." : null;
+  }
+
+  if (items.length > settings.maxFiles) {
+    return settings.maxFiles === 1 ? "Upload one file." : `Upload up to ${settings.maxFiles} files.`;
+  }
+
+  for (const item of items) {
+    if (isUploadId(item)) {
+      continue;
+    }
+
+    if (isSubmissionFileRef(item)) {
+      if (item.size > settings.maxFileSizeBytes) {
+        return `File must be ${settings.maxFileSizeMb} MB or smaller.`;
+      }
+      if (!mimeAllowed(item.contentType, settings.accept)) {
+        return "This file type is not allowed.";
+      }
+      continue;
+    }
+
+    if (isBrowserFileLike(item)) {
+      if (item.size > settings.maxFileSizeBytes) {
+        return `File must be ${settings.maxFileSizeMb} MB or smaller.`;
+      }
+      const contentType = item.type || "application/octet-stream";
+      if (!mimeAllowed(contentType, settings.accept)) {
+        return "This file type is not allowed.";
+      }
+      continue;
+    }
+
+    return "Upload a valid file.";
+  }
+
+  return null;
+}
+
+function normalizeFileValue(field: FormField, value: unknown): SubmissionValue | undefined {
+  const items = fileItems(value);
+  if (items.length === 0) {
+    return undefined;
+  }
+
+  const settings = fileFieldSettings(field);
+  if (items.every(isUploadId)) {
+    return settings.maxFiles === 1 ? (items[0] as string) : (items as string[]);
+  }
+
+  if (items.every(isSubmissionFileRef)) {
+    const refs = items as SubmissionFileRef[];
+    return settings.maxFiles === 1 ? refs[0]! : refs;
+  }
+
+  // Callback-only browser File objects stay as-is for the consumer.
+  return value as SubmissionValue;
+}
+
 function typeError(field: FormField, value: unknown): string | null {
+  if (field.type === "file") {
+    return fileTypeError(field, value);
+  }
+
   if (field.type === "checkbox") {
     if (typeof value !== "boolean") {
       return "Enter a true or false value.";
@@ -193,6 +276,14 @@ export function validatePayload(
     const message = typeError(field, data[field.id]);
     if (message) {
       errors.push({ path: field.id, message });
+      continue;
+    }
+
+    if (field.type === "file") {
+      const fileValue = normalizeFileValue(field, data[field.id]);
+      if (fileValue !== undefined) {
+        normalized[field.id] = fileValue;
+      }
       continue;
     }
 

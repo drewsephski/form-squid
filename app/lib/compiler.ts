@@ -3,6 +3,7 @@ import path from "node:path";
 import ts from "typescript";
 import { appearanceClassName, appearanceStyle, resolveAppearance, submitClassName, submitSlotClassName } from "./appearance";
 import { formSpecSchema, type FormSpec } from "./definitions";
+import { exportedFileFieldSource } from "./exported-file-field";
 
 export type CompiledForm = {
   schemaSource: string;
@@ -72,13 +73,15 @@ ${stepEntries}
 }
 
 export type CompileTarget =
-  | { submission: "formsquid"; url: string }
+  | { submission: "formsquid"; url: string; uploadUrl: string }
   | { submission: "callback" };
 
 function formSource(spec: FormSpec, target: CompileTarget): string {
   const appearance = resolveAppearance(spec);
   const hosted = target.submission === "formsquid";
-  const submitBinding = hosted ? `const submitUrl = ${JSON.stringify(target.url)};\n` : "";
+  const submitBinding = hosted
+    ? `const submitUrl = ${JSON.stringify(target.url)};\nconst uploadUrl = ${JSON.stringify(target.uploadUrl)};\n`
+    : "";
   const componentSignature = hosted
     ? "export function ExportedForm() {"
     : `export function ExportedForm({
@@ -95,10 +98,11 @@ function formSource(spec: FormSpec, target: CompileTarget): string {
       return;
     }
     try {
+      const payload = serializeSubmission(values);
       const response = await fetch(submitUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...((values as Record<string, unknown>) ?? {}), _gotcha: honeypot }),
+        body: JSON.stringify({ ...payload, _gotcha: honeypot }),
       });
       if (response.ok) {
         setDone(true);
@@ -121,7 +125,7 @@ function formSource(spec: FormSpec, target: CompileTarget): string {
       setSubmitError(message);
     }
   }`;
-  const honeypotField = hosted
+  const fileFieldSource = exportedFileFieldSource(hosted);  const honeypotField = hosted
     ? `        <input
           className="hidden"
           tabIndex={-1}
@@ -175,6 +179,9 @@ const spec = ${JSON.stringify(spec, null, 2)} as {
       required: boolean;
       options?: Array<{ value: string; label: string }>;
       visibleWhen?: { fieldId: string; equals: string };
+      maxFiles?: 1 | 5;
+      maxFileSizeMb?: number;
+      accept?: string[];
     }>;
   }>;
 };
@@ -360,7 +367,12 @@ function conditionMet(formSpec: typeof spec, values: Record<string, unknown>, fi
   return value === rule.equals;
 }
 
+${fileFieldSource}
+
 function renderControl(field: (typeof spec.steps)[number]["fields"][number], control: { value?: unknown; onChange: (value: unknown) => void }) {
+  if (field.type === "file") {
+    return <FileField field={field} value={control.value} onChange={control.onChange} />;
+  }
   if (field.type === "textarea") {
     return <Textarea placeholder={field.placeholder} value={String(control.value ?? "")} onChange={(event) => control.onChange(event.target.value)} />;
   }

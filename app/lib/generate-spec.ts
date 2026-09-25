@@ -11,6 +11,8 @@ const instructions = [
   "visibleWhen may only reference an earlier field.",
   "checkbox is one boolean, not a group.",
   "select and radio need unique options.",
+  "Use type file for resumes, screenshots, project briefs, and attachments.",
+  "For file fields set maxFiles to 1 or 5, maxFileSizeMb as a positive integer, and accept as a MIME list or null.",
   "No HTML.",
   "At most 5 steps and 40 fields.",
 ].join(" ");
