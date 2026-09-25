@@ -13,10 +13,17 @@ export function bucketStart(now: Date) {
   return start;
 }
 
+export function requireRateLimitSalt(value: string | undefined) {
+  if (!value) {
+    throw new Error("RATE_LIMIT_IP_SALT is required");
+  }
+  return value;
+}
+
 export function clientAddress(forwardedFor: string | undefined) {
-  const first = forwardedFor?.split(",")[0]?.trim() ?? "";
-  if (!first || first.length > 128) return "unknown";
-  return first;
+  const last = forwardedFor?.split(",").map((part) => part.trim()).filter(Boolean).at(-1) ?? "";
+  if (!last || last.length > 128) return "unknown";
+  return last;
 }
 
 export function hashClientAddress(address: string, salt: string) {

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { db } from "../db/function";
-import { clientAddress, hashClientAddress } from "../server/rate-limit";
+import { clientAddress, hashClientAddress, requireRateLimitSalt } from "../server/rate-limit";
 import { submissionLog } from "../server/submission-log";
 import { submitForm } from "../server/submit-form";
 
@@ -12,6 +12,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type",
   "Access-Control-Expose-Headers": "X-Request-Id",
 };
+
+const salt = requireRateLimitSalt(process.env.RATE_LIMIT_IP_SALT);
 
 const app = new Hono();
 
@@ -34,7 +36,6 @@ app.post("/forms/:slug/submissions", async (c) => {
   const requestId = randomUUID();
   const started = Date.now();
   const headers: Record<string, string> = { ...corsHeaders, "X-Request-Id": requestId };
-  const salt = process.env.RATE_LIMIT_IP_SALT ?? "";
   const actorHash = hashClientAddress(clientAddress(c.req.header("x-forwarded-for")), salt);
 
   try {
