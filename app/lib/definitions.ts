@@ -226,4 +226,5 @@ export const pendingSpecKey = "formsquid:pending-spec";
 export const honeypotField = "_gotcha";
 export const maxSubmissionBytes = 32 * 1024;
 export const maxSubmissionsPerDay = 1000;
+export const maxSubmissionAttemptsPerMinute = 20;
 export const maxPayloadStringLength = 5000;

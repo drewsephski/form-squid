@@ -1,11 +1,14 @@
 import { defineConfig } from "@neon/config/v1";
 
-const resendEnv: Record<string, string> = {};
+const functionEnv: Record<string, string> = {};
 if (process.env.RESEND_API_KEY) {
-  resendEnv.RESEND_API_KEY = process.env.RESEND_API_KEY;
+  functionEnv.RESEND_API_KEY = process.env.RESEND_API_KEY;
 }
 if (process.env.RESEND_FROM) {
-  resendEnv.RESEND_FROM = process.env.RESEND_FROM;
+  functionEnv.RESEND_FROM = process.env.RESEND_FROM;
+}
+if (process.env.RATE_LIMIT_IP_SALT) {
+  functionEnv.RATE_LIMIT_IP_SALT = process.env.RATE_LIMIT_IP_SALT;
 }
 
 export default defineConfig({
@@ -14,7 +17,7 @@ export default defineConfig({
       name: "FormSquid API",
       source: "./functions/api.ts",
       customDomains: ["api.formsquid.com"],
-      ...(Object.keys(resendEnv).length > 0 ? { env: resendEnv } : {}),
+      ...(Object.keys(functionEnv).length > 0 ? { env: functionEnv } : {}),
     },
     maintenance: {
       name: "Maintenance",

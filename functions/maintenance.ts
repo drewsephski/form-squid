@@ -11,6 +11,7 @@ export default {
     }
 
     await db.execute(sql`DELETE FROM generation_events WHERE created_at < NOW() - INTERVAL '7 days'`);
+    await db.execute(sql`DELETE FROM submission_rate_buckets WHERE bucket_start < NOW() - INTERVAL '1 hour'`);
     return new Response(null, { status: 204 });
   },
 };

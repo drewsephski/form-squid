@@ -1,4 +1,4 @@
-import { index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { user } from "./auth-schema";
 
 export * from "./auth-schema";
@@ -58,6 +58,22 @@ export const submissions = pgTable(
   (table) => [
     index("submissions_form_id_idx").on(table.formId),
     index("submissions_form_created_idx").on(table.formId, table.createdAt),
+  ],
+);
+
+export const submissionRateBuckets = pgTable(
+  "submission_rate_buckets",
+  {
+    formId: text("form_id")
+      .notNull()
+      .references(() => forms.id, { onDelete: "cascade" }),
+    actorHash: text("actor_hash").notNull(),
+    bucketStart: timestamp("bucket_start", { withTimezone: true }).notNull(),
+    attempts: integer("attempts").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.formId, table.actorHash, table.bucketStart] }),
+    index("submission_rate_buckets_start_idx").on(table.bucketStart),
   ],
 );
 

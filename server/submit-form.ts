@@ -12,15 +12,35 @@ import {
 import { validateSubmission } from "../app/lib/validate-submission";
 import * as schema from "../db/schema";
 import { formVersions, forms, submissions } from "../db/schema";
+import { reserveSubmissionAttempt } from "./rate-limit";
+import type { SubmissionEvent } from "./submission-log";
 
 export type SubmitDatabase = NodePgDatabase<typeof schema>;
 
-export type SubmitResponse =
-  | { status: 200; body: { ok: true } }
-  | { status: 400; body: { ok: false; error: string } | { ok: false; errors: SubmissionError[] } }
-  | { status: 404; body: { ok: false; error: string } }
-  | { status: 413; body: { ok: false; error: string } }
-  | { status: 429; body: { ok: false; error: string } };
+type SubmitBody =
+  | { ok: true }
+  | { ok: false; error: string }
+  | { ok: false; errors: SubmissionError[] };
+
+export type SubmitResponse = {
+  status: 200 | 400 | 404 | 413 | 429;
+  body: SubmitBody;
+  event: SubmissionEvent;
+  formId: string | null;
+  reason: string;
+  retryAfter?: number;
+};
+
+function respond(
+  status: SubmitResponse["status"],
+  body: SubmitBody,
+  event: SubmissionEvent,
+  reason: string,
+  formId: string | null = null,
+  retryAfter?: number,
+): SubmitResponse {
+  return { status, body, event, formId, reason, ...(retryAfter ? { retryAfter } : {}) };
+}
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -28,32 +48,49 @@ function isJsonObject(value: unknown): value is Record<string, unknown> {
 
 export async function submitForm(
   database: SubmitDatabase,
-  input: { slug: string; rawBody: string },
+  input: { slug: string; rawBody: string; actorHash: string; now?: Date },
 ): Promise<SubmitResponse> {
+  const now = input.now ?? new Date();
   if (Buffer.byteLength(input.rawBody, "utf8") > maxSubmissionBytes) {
-    return { status: 413, body: { ok: false, error: "Submission is too large." } };
+    return respond(413, { ok: false, error: "Submission is too large." }, "submission.invalid", "too_large");
+  }
+
+  const [form] = await database.select().from(forms).where(eq(forms.slug, input.slug));
+  if (!form?.currentPublishedVersionId) {
+    return respond(404, { ok: false, error: "Form not found." }, "submission.not_found", "missing_form");
+  }
+
+  const rate = await reserveSubmissionAttempt(database, {
+    formId: form.id,
+    actorHash: input.actorHash,
+    now,
+  });
+  if (!rate.allowed) {
+    return respond(
+      429,
+      { ok: false, error: "Too many attempts. Try again in a minute." },
+      "submission.rate_limited",
+      "attempt_window",
+      form.id,
+      rate.retryAfter,
+    );
   }
 
   let body: unknown = {};
   try {
     body = input.rawBody ? JSON.parse(input.rawBody) : {};
   } catch {
-    return { status: 400, body: { ok: false, error: "Expected JSON." } };
+    return respond(400, { ok: false, error: "Expected JSON." }, "submission.invalid", "expected_json", form.id);
   }
 
   if (!isJsonObject(body)) {
-    return { status: 400, body: { ok: false, error: "Expected a JSON object." } };
+    return respond(400, { ok: false, error: "Expected a JSON object." }, "submission.invalid", "expected_object", form.id);
   }
 
   const honeypot = body[honeypotField];
   delete body[honeypotField];
   if (typeof honeypot === "string" && honeypot.trim()) {
-    return { status: 200, body: { ok: true } };
-  }
-
-  const [form] = await database.select().from(forms).where(eq(forms.slug, input.slug));
-  if (!form?.currentPublishedVersionId) {
-    return { status: 404, body: { ok: false, error: "Form not found." } };
+    return respond(200, { ok: true }, "submission.accepted", "honeypot", form.id);
   }
 
   const [version] = await database
@@ -61,22 +98,28 @@ export async function submitForm(
     .from(formVersions)
     .where(eq(formVersions.id, form.currentPublishedVersionId));
   if (!version) {
-    return { status: 404, body: { ok: false, error: "Form not found." } };
+    return respond(404, { ok: false, error: "Form not found." }, "submission.not_found", "missing_version", form.id);
   }
 
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const [countRow] = await database
     .select({ count: sql<number>`count(*)::int` })
     .from(submissions)
     .where(and(eq(submissions.formId, form.id), gte(submissions.createdAt, since)));
   if ((countRow?.count ?? 0) >= maxSubmissionsPerDay) {
-    return { status: 429, body: { ok: false, error: "This form is not accepting submissions right now." } };
+    return respond(
+      429,
+      { ok: false, error: "This form is not accepting submissions right now." },
+      "submission.rate_limited",
+      "daily_cap",
+      form.id,
+    );
   }
 
   const spec = formSpecSchema.parse(version.spec);
   const result = validateSubmission(spec, body);
   if (!result.ok) {
-    return { status: 400, body: { ok: false, errors: result.errors } };
+    return respond(400, { ok: false, errors: result.errors }, "submission.invalid", "validation", form.id);
   }
 
   await database.insert(submissions).values({
@@ -98,5 +141,5 @@ export async function submitForm(
       .catch(() => undefined);
   }
 
-  return { status: 200, body: { ok: true } };
+  return respond(200, { ok: true }, "submission.accepted", "stored", form.id);
 }
