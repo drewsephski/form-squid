@@ -38,7 +38,9 @@ function AnimateHeight({ className, children }: AnimateHeightProps) {
     }
 
     function sync(element: HTMLDivElement) {
-      const next = element.getBoundingClientRect().height
+      // offsetHeight is layout size; getBoundingClientRect shrinks under CSS scale
+      // and would clip scaled previews (e.g. FormMiniPreview).
+      const next = element.offsetHeight
       setHeight((current) => (current === next ? current : next))
     }
 

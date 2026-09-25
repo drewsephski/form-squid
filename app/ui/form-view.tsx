@@ -20,11 +20,13 @@ interface FormViewProps {
   spec: FormSpec;
   submitUrl?: string;
   preview?: boolean;
+  /** Tighter padding/spacing for thumbnail card previews. */
+  compact?: boolean;
   /** Prefix field element ids when multiple forms render on one page. */
   idPrefix?: string;
 }
 
-export function FormView({ spec, submitUrl, preview = false, idPrefix = "" }: FormViewProps) {
+export function FormView({ spec, submitUrl, preview = false, compact = false, idPrefix = "" }: FormViewProps) {
   const [stepIndex, setStepIndex] = useState(0);
   const [values, setValues] = useState<Record<string, string | number | boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -153,7 +155,7 @@ export function FormView({ spec, submitUrl, preview = false, idPrefix = "" }: Fo
   } else {
     body = (
       <form
-        className={`${frameClass} space-y-6 rounded-xl px-6 py-6`}
+        className={`${frameClass} rounded-xl ${compact ? "space-y-4 px-4 py-4" : "space-y-6 px-6 py-6"}`}
         style={frameStyle}
         data-formsquid-theme={appearance.theme}
         onSubmit={(event) => {
@@ -215,6 +217,10 @@ export function FormView({ spec, submitUrl, preview = false, idPrefix = "" }: Fo
         {submitError ? <p role="alert" className="text-sm text-destructive">{submitError}</p> : null}
       </form>
     );
+  }
+
+  if (compact) {
+    return body;
   }
 
   return <AnimateHeight>{body}</AnimateHeight>;
