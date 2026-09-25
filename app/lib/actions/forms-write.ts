@@ -111,6 +111,34 @@ export async function restoreVersion(formId: string, versionId: string) {
   return spec satisfies FormSpec;
 }
 
+export async function unpublishForm(formId: string) {
+  const user = await requireUser();
+  await requireFormOwner(formId, user.id);
+  await db.update(forms).set({ currentPublishedVersionId: null, updatedAt: new Date() }).where(eq(forms.id, formId));
+}
+
+export async function duplicateForm(formId: string) {
+  const user = await requireUser();
+  const form = await requireFormOwner(formId, user.id);
+  const spec = formSpecSchema.parse(form.draftSpec);
+  const title = `${spec.title} copy`.slice(0, 200);
+  const id = randomUUID();
+  await db.insert(forms).values({
+    id,
+    userId: user.id,
+    slug: await uniqueSlug(title),
+    registryKey: randomBytes(24).toString("hex"),
+    draftSpec: { ...spec, title },
+  });
+  return { id };
+}
+
+export async function deleteForm(formId: string) {
+  const user = await requireUser();
+  await requireFormOwner(formId, user.id);
+  await db.delete(forms).where(eq(forms.id, formId));
+}
+
 export async function updateNotifyEmail(formId: string, notifyEmail: string) {
   const user = await requireUser();
   await requireFormOwner(formId, user.id);

@@ -17,3 +17,13 @@ export function hostedHost(slug: string) {
   const root = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "formsquid.com";
   return `${slug}.${root}`;
 }
+
+export function hostedUrl(slug: string, location?: { protocol: string; hostname: string; port: string }) {
+  const root = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "formsquid.com";
+  const local = location && (location.hostname === "localhost" || location.hostname.endsWith(".localhost") || root === "localhost");
+  if (local && location) {
+    const port = location.port ? `:${location.port}` : "";
+    return `${location.protocol}//${slug}.localhost${port}`;
+  }
+  return `https://${hostedHost(slug)}`;
+}

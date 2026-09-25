@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { listForms } from "@/app/lib/actions/forms-read";
+import { FormsList } from "@/app/ui/forms-list";
 import { buttonVariants } from "@/components/ui/button";
 
 export default async function FormsPage() {
@@ -22,26 +23,7 @@ export default async function FormsPage() {
           New form
         </Link>
       </div>
-      {forms.length === 0 ? (
-        <p className="text-muted-foreground">No forms yet.</p>
-      ) : (
-        <ul className="grid gap-3">
-          {forms.map((form) => (
-            <li key={form.id} className="flex items-center justify-between gap-4 rounded-xl border p-4">
-              <div className="min-w-0 space-y-1">
-                <p className="truncate font-medium">{form.title}</p>
-                <p className="truncate text-sm text-muted-foreground">{form.host}</p>
-                <p className="text-sm text-muted-foreground">
-                  {form.published ? "Published" : "Draft"} · {form.responses} {form.responses === 1 ? "response" : "responses"}
-                </p>
-              </div>
-              <Link href={`/forms/${form.id}`} className={buttonVariants({ variant: "outline" })}>
-                Edit
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+      <FormsList forms={forms} />
     </main>
   );
 }

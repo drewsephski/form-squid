@@ -89,6 +89,7 @@ export async function listForms() {
       host: hostedHost(row.slug),
       published: Boolean(row.currentPublishedVersionId),
       responses: counts.get(row.id) ?? 0,
+      updatedAt: row.updatedAt.toISOString(),
     };
   });
 }
@@ -102,6 +103,8 @@ export async function getForm(formId: string) {
     .where(eq(formVersions.formId, formId))
     .orderBy(desc(formVersions.versionNumber));
   const page = await pageSubmissions(formId);
+  const published = versions.find((version) => version.id === form.currentPublishedVersionId);
+  const publishedSpec = published ? formSpecSchema.safeParse(published.spec) : null;
 
   return {
     id: form.id,
@@ -110,11 +113,17 @@ export async function getForm(formId: string) {
     registryKey: form.registryKey,
     draftSpec: formSpecSchema.parse(form.draftSpec),
     publishedVersionId: form.currentPublishedVersionId,
-    versions: versions.map((version) => ({
-      id: version.id,
-      versionNumber: version.versionNumber,
-      createdAt: version.createdAt.toISOString(),
-    })),
+    publishedSpec: publishedSpec?.success ? publishedSpec.data : null,
+    publishedAt: published?.createdAt.toISOString() ?? null,
+    versions: versions.map((version) => {
+      const parsed = formSpecSchema.safeParse(version.spec);
+      return {
+        id: version.id,
+        versionNumber: version.versionNumber,
+        createdAt: version.createdAt.toISOString(),
+        spec: parsed.success ? parsed.data : null,
+      };
+    }),
     submissions: page.submissions,
     nextCursor: page.nextCursor,
   };

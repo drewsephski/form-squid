@@ -42,6 +42,28 @@ export function FormView({ spec, submitUrl, preview = false }: FormViewProps) {
       }
       return { ...current, [id]: value };
     });
+    setErrors((current) => {
+      if (!current[id]) {
+        return current;
+      }
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+  }
+
+  function showErrors(next: Record<string, string>) {
+    setErrors(next);
+    const fieldId = Object.keys(next)[0];
+    if (!fieldId) {
+      return;
+    }
+    const node = document.querySelector(`[data-field="${fieldId}"]`);
+    const focusable = node?.querySelector("input, textarea, button");
+    node?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (focusable instanceof HTMLElement) {
+      focusable.focus();
+    }
   }
 
   function visible(field: FormField) {
@@ -51,7 +73,7 @@ export function FormView({ spec, submitUrl, preview = false }: FormViewProps) {
   function handleNext() {
     const result = validateSubmission(spec, values, { stepId: step.id });
     if (!result.ok) {
-      setErrors(Object.fromEntries(result.errors.filter((error) => error.path).map((error) => [error.path, error.message])));
+      showErrors(Object.fromEntries(result.errors.filter((error) => error.path).map((error) => [error.path, error.message])));
       return;
     }
     setErrors({});
@@ -61,7 +83,7 @@ export function FormView({ spec, submitUrl, preview = false }: FormViewProps) {
   async function handleSubmit() {
     const result = validateSubmission(spec, values);
     if (!result.ok) {
-      setErrors(Object.fromEntries(result.errors.filter((error) => error.path).map((error) => [error.path, error.message])));
+      showErrors(Object.fromEntries(result.errors.filter((error) => error.path).map((error) => [error.path, error.message])));
       return;
     }
     if (preview || honeypot) {
@@ -94,8 +116,23 @@ export function FormView({ spec, submitUrl, preview = false }: FormViewProps) {
   }
 
   if (done) {
-    return <p className="text-lg">{spec.successMessage}</p>;
+    return (
+      <div className="space-y-4 py-8 text-center">
+        <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-primary/15 text-lg text-primary" aria-hidden="true">
+          ✓
+        </div>
+        <p className="text-lg">{spec.successMessage}</p>
+        <p className="text-sm text-muted-foreground">
+          Made with{" "}
+          <a className="underline underline-offset-4" href="https://formsquid.com">
+            FormSquid
+          </a>
+        </p>
+      </div>
+    );
   }
+
+  const progress = ((stepIndex + 1) / spec.steps.length) * 100;
 
   return (
     <form
@@ -113,7 +150,19 @@ export function FormView({ spec, submitUrl, preview = false }: FormViewProps) {
         <h1 className="text-2xl font-semibold tracking-tight">{spec.title}</h1>
         {spec.description ? <p className="text-muted-foreground">{spec.description}</p> : null}
       </div>
-      <h2 className="text-lg font-medium">{step.title}</h2>
+      {spec.steps.length > 1 ? (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Step {stepIndex + 1} of {spec.steps.length}
+          </p>
+          <h2 className="text-lg font-medium">{step.title}</h2>
+          <div className="h-1 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+            <div className="h-full bg-foreground transition-all" style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+      ) : (
+        <h2 className="text-lg font-medium">{step.title}</h2>
+      )}
       {step.fields.filter(visible).map((field) => (
         <FieldControl
           key={field.id}
@@ -138,7 +187,7 @@ export function FormView({ spec, submitUrl, preview = false }: FormViewProps) {
           </Button>
         ) : null}
         <Button type="submit" disabled={pending}>
-          {stepIndex < spec.steps.length - 1 ? "Next" : spec.submitLabel}
+          {pending ? "Sending…" : stepIndex < spec.steps.length - 1 ? "Next" : spec.submitLabel}
         </Button>
       </div>
       {submitError ? <p role="alert" className="text-sm text-destructive">{submitError}</p> : null}
@@ -156,14 +205,17 @@ interface FieldControlProps {
 function FieldControl({ field, value, error, onChange }: FieldControlProps) {
   const id = `field-${field.id}`;
   return (
-    <div className="grid gap-2">
-      <Label htmlFor={id}>{field.label}</Label>
+    <div className="grid gap-2" data-field={field.id}>
+      <Label htmlFor={id}>
+        {field.label}
+        {field.required ? <span className="text-destructive"> *</span> : null}
+      </Label>
       {field.type === "textarea" ? (
-        <Textarea id={id} placeholder={field.placeholder} value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)} aria-invalid={Boolean(error)} />
+        <Textarea id={id} placeholder={field.placeholder} value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)} aria-invalid={Boolean(error)} aria-required={field.required} />
       ) : null}
       {field.type === "select" ? (
         <Select value={typeof value === "string" ? value : undefined} onValueChange={(next) => { if (next) onChange(next); }}>
-          <SelectTrigger id={id} aria-invalid={Boolean(error)}>
+          <SelectTrigger id={id} aria-invalid={Boolean(error)} aria-required={field.required}>
             <SelectValue placeholder={field.placeholder ?? "Select"} />
           </SelectTrigger>
           <SelectContent>
@@ -186,7 +238,7 @@ function FieldControl({ field, value, error, onChange }: FieldControlProps) {
         </RadioGroup>
       ) : null}
       {field.type === "checkbox" ? (
-        <Checkbox id={id} checked={value === true} onCheckedChange={(checked) => onChange(checked === true)} aria-invalid={Boolean(error)} />
+        <Checkbox id={id} checked={value === true} onCheckedChange={(checked) => onChange(checked === true)} aria-invalid={Boolean(error)} aria-required={field.required} />
       ) : null}
       {field.type === "text" || field.type === "email" || field.type === "number" || field.type === "date" ? (
         <Input
@@ -195,6 +247,7 @@ function FieldControl({ field, value, error, onChange }: FieldControlProps) {
           placeholder={field.placeholder}
           value={typeof value === "number" ? (Number.isFinite(value) ? value : "") : value === undefined ? "" : String(value)}
           aria-invalid={Boolean(error)}
+          aria-required={field.required}
           onChange={(event) => onChange(field.type === "number" ? parseNumberInput(event.target.value) : event.target.value)}
         />
       ) : null}

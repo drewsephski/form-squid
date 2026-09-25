@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { generateAction } from "@/app/lib/actions/generate";
@@ -14,7 +13,12 @@ import { publishForm, restoreVersion, updateDraft, updateNotifyEmail } from "@/a
 import { deleteSubmission } from "@/app/lib/actions/submissions-write";
 import { compileAction } from "@/app/lib/actions/compile";
 import { describeSpecChange } from "@/app/lib/diff-spec";
-import { formSpecSchema, type FormField, type FormSpec } from "@/app/lib/definitions";
+import { type FormSpec } from "@/app/lib/definitions";
+import { specIssue, specsMatch } from "@/app/lib/edit-spec";
+import { hostedHost, hostedUrl } from "@/app/lib/origin";
+import { labeledAnswers, submissionIdentity, submissionSearchText } from "@/app/lib/submission-display";
+import { formatPublished, formatResponseTime } from "@/lib/formatter";
+import { FieldsInspector, FormSettings } from "@/app/ui/editor-inspector";
 import { FormView } from "@/app/ui/form-view";
 
 interface EditorForm {
@@ -24,95 +28,130 @@ interface EditorForm {
   registryKey: string;
   draftSpec: FormSpec;
   publishedVersionId: string | null;
-  versions: Array<{ id: string; versionNumber: number; createdAt: string }>;
+  publishedSpec: FormSpec | null;
+  publishedAt: string | null;
+  versions: Array<{ id: string; versionNumber: number; createdAt: string; spec: FormSpec | null }>;
   submissions: Array<{ id: string; formVersionId: string; payload: unknown; createdAt: string }>;
   nextCursor: string | null;
+}
+
+function liveHref(slug: string) {
+  if (typeof window === "undefined") {
+    return hostedUrl(slug);
+  }
+  return hostedUrl(slug, window.location);
 }
 
 export function Editor({ form }: { form: EditorForm }) {
   const router = useRouter();
   const [spec, setSpec] = useState(form.draftSpec);
   const [slug, setSlug] = useState(form.slug);
+  const [savedSpec, setSavedSpec] = useState(form.draftSpec);
+  const [savedSlug, setSavedSlug] = useState(form.slug);
+  const [publishedSpec, setPublishedSpec] = useState(form.publishedSpec);
+  const [publishedAt, setPublishedAt] = useState(form.publishedAt);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [selectedFieldId, setSelectedFieldId] = useState("");
   const [notifyEmail, setNotifyEmail] = useState(form.notifyEmail);
   const [instruction, setInstruction] = useState("");
   const [candidate, setCandidate] = useState<FormSpec | null>(null);
+  const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState(form.submissions[0]?.id ?? "");
   const [extraSubmissions, setExtraSubmissions] = useState<EditorForm["submissions"]>([]);
   const [nextCursor, setNextCursor] = useState(form.nextCursor);
   const [submissionSource, setSubmissionSource] = useState(form.submissions);
+  const [pending, setPending] = useState(false);
+  const [compiled, setCompiled] = useState<{ schemaSource: string; formSource: string } | null>(null);
+  const saveSeq = useRef(0);
+  const writeQueue = useRef<Promise<void>>(Promise.resolve());
+
   if (submissionSource !== form.submissions) {
     setSubmissionSource(form.submissions);
     setExtraSubmissions([]);
     setNextCursor(form.nextCursor);
   }
-  const [pending, setPending] = useState(false);
-  const [compiled, setCompiled] = useState<{ schemaSource: string; formSource: string } | null>(null);
+
+  const draftIssue = specIssue(spec);
+  const dirty = !specsMatch(spec, savedSpec) || slug !== savedSlug;
+  if (!dirty && (saving || saveError)) {
+    setSaving(false);
+    setSaveError("");
+  }
+
+  useEffect(() => {
+    if (!dirty || draftIssue) {
+      return;
+    }
+    const seq = saveSeq.current + 1;
+    saveSeq.current = seq;
+    const timer = window.setTimeout(() => {
+      const job = writeQueue.current.catch(() => undefined).then(async () => {
+        if (saveSeq.current !== seq) {
+          return;
+        }
+        setSaving(true);
+        try {
+          await updateDraft(form.id, spec, slug);
+          if (saveSeq.current !== seq) {
+            return;
+          }
+          setSavedSpec(spec);
+          setSavedSlug(slug);
+          setSaving(false);
+          setSaveError("");
+        } catch (error: unknown) {
+          if (saveSeq.current !== seq) {
+            return;
+          }
+          setSaving(false);
+          setSaveError(error instanceof Error ? error.message : "Could not save.");
+        }
+      });
+      writeQueue.current = job;
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [dirty, draftIssue, form.id, slug, spec]);
+
   const submissions = [...form.submissions, ...extraSubmissions];
-  const selected = submissions.find((row) => row.id === selectedId) ?? submissions[0];
+  const visibleSubmissions = submissions.filter((row) => {
+    const version = form.versions.find((item) => item.id === row.formVersionId)?.spec ?? null;
+    return submissionSearchText(version, row.payload).includes(query.trim().toLowerCase());
+  });
+  const selected = visibleSubmissions.find((row) => row.id === selectedId) ?? visibleSubmissions[0];
+  const selectedSpec = selected ? form.versions.find((version) => version.id === selected.formVersionId)?.spec ?? null : null;
+  const published = Boolean(publishedSpec);
+  const unpublished = publishedSpec !== null && (!specsMatch(spec, publishedSpec) || slug !== savedSlug);
+  const status = saving
+    ? "Saving…"
+    : dirty
+      ? draftIssue || saveError || "Unsaved changes"
+      : unpublished
+        ? "Unpublished changes"
+        : published && publishedAt
+          ? formatPublished(publishedAt)
+          : "Saved";
 
-  function updateField(fieldId: string, patch: Partial<FormField>) {
-    setSpec((current) => ({
-      ...current,
-      steps: current.steps.map((step) => ({
-        ...step,
-        fields: step.fields.map((field) => (field.id === fieldId ? { ...field, ...patch } : field)),
-      })),
-    }));
-  }
-
-  function moveField(fieldId: string, direction: -1 | 1) {
-    setSpec((current) => ({
-      ...current,
-      steps: current.steps.map((step) => {
-        const index = step.fields.findIndex((field) => field.id === fieldId);
-        const nextIndex = index + direction;
-        if (index < 0 || nextIndex < 0 || nextIndex >= step.fields.length) {
-          return step;
-        }
-        const fields = [...step.fields];
-        const [item] = fields.splice(index, 1);
-        if (!item) {
-          return step;
-        }
-        fields.splice(nextIndex, 0, item);
-        return { ...step, fields };
-      }),
-    }));
-  }
-
-  function deleteField(fieldId: string) {
-    setSpec((current) => ({
-      ...current,
-      steps: current.steps.map((step) => ({
-        ...step,
-        fields: step.fields.filter((field) => field.id !== fieldId),
-      })),
-    }));
-  }
-
-  async function handleSave() {
-    const parsed = formSpecSchema.safeParse(spec);
-    if (!parsed.success) {
-      toast.error(parsed.error.issues[0]?.message ?? "Fix the form before saving.");
+  async function handlePublish() {
+    const issue = specIssue(spec);
+    if (issue) {
+      toast.error(issue);
       return;
     }
     setPending(true);
+    saveSeq.current += 1;
     try {
-      await updateDraft(form.id, parsed.data, slug);
-      toast.success("Draft saved");
-      router.refresh();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not save.");
-    } finally {
-      setPending(false);
-    }
-  }
-
-  async function handlePublish() {
-    setPending(true);
-    try {
-      await publishForm(form.id, spec, slug);
-      toast.success("Published");
+      await writeQueue.current.catch(() => undefined);
+      const nextSpec = spec;
+      const nextSlug = slug;
+      await publishForm(form.id, nextSpec, nextSlug);
+      saveSeq.current += 1;
+      setSavedSpec(nextSpec);
+      setSavedSlug(nextSlug);
+      setPublishedSpec(nextSpec);
+      setPublishedAt(new Date().toISOString());
+      setSaving(false);
+      setSaveError("");
       router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not publish.");
@@ -132,6 +171,15 @@ export function Editor({ form }: { form: EditorForm }) {
     setCandidate(result.spec);
   }
 
+  async function handleCopyLink() {
+    try {
+      await navigator.clipboard.writeText(liveHref(savedSlug));
+      toast.success("Link copied");
+    } catch {
+      toast.error("Could not copy the link.");
+    }
+  }
+
   return (
     <div className="grid gap-8">
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
@@ -142,6 +190,7 @@ export function Editor({ form }: { form: EditorForm }) {
           <TabsList>
             <TabsTrigger value="ai">AI</TabsTrigger>
             <TabsTrigger value="fields">Fields</TabsTrigger>
+            <TabsTrigger value="form">Form</TabsTrigger>
           </TabsList>
           <TabsContent value="ai" className="space-y-3">
             <Textarea aria-label="Edit instruction" value={instruction} onChange={(event) => setInstruction(event.target.value)} placeholder="Split this into two steps." />
@@ -155,33 +204,38 @@ export function Editor({ form }: { form: EditorForm }) {
               </div>
             ) : null}
           </TabsContent>
-          <TabsContent value="fields" className="space-y-4">
-            <div className="grid gap-2">
-              <Label htmlFor="slug">Address</Label>
-              <Input id="slug" value={slug} onChange={(event) => setSlug(event.target.value)} />
-            </div>
-            {spec.steps.flatMap((step) => step.fields).map((field) => (
-              <div key={field.id} className="grid gap-2 rounded-lg border p-3">
-                <Label htmlFor={`${field.id}-label`}>{field.id}</Label>
-                <Input id={`${field.id}-label`} value={field.label} onChange={(event) => updateField(field.id, { label: event.target.value })} />
-                <Input aria-label={`${field.label} placeholder`} value={field.placeholder ?? ""} onChange={(event) => updateField(field.id, { placeholder: event.target.value || undefined })} />
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={field.required} onChange={(event) => updateField(field.id, { required: event.target.checked })} />
-                  Required
-                </label>
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" onClick={() => moveField(field.id, -1)}>Up</Button>
-                  <Button type="button" variant="outline" onClick={() => moveField(field.id, 1)}>Down</Button>
-                  <Button type="button" variant="outline" onClick={() => deleteField(field.id)}>Delete</Button>
-                </div>
-              </div>
-            ))}
+          <TabsContent value="fields">
+            <FieldsInspector spec={spec} slug={slug} selectedId={selectedFieldId} onSpec={setSpec} onSlug={setSlug} onSelect={setSelectedFieldId} />
+          </TabsContent>
+          <TabsContent value="form">
+            <FormSettings spec={spec} slug={slug} selectedId={selectedFieldId} onSpec={setSpec} onSlug={setSlug} onSelect={setSelectedFieldId} />
           </TabsContent>
         </Tabs>
       </div>
-      <div className="flex gap-2">
-        <Button type="button" variant="outline" onClick={() => void handleSave()} disabled={pending}>Save draft</Button>
-        <Button type="button" onClick={() => void handlePublish()} disabled={pending}>Publish</Button>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="space-y-1">
+          <p className="text-sm">
+            {published ? <span className="mr-2 inline-block size-2 rounded-full bg-primary align-middle" aria-hidden="true" /> : null}
+            {published ? "Published" : "Draft"}
+          </p>
+          <p className="text-sm text-muted-foreground">{status}</p>
+          {published ? <p className="font-mono text-sm">{hostedHost(savedSlug)}</p> : null}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {published ? (
+            <Button type="button" variant="outline" onClick={() => void handleCopyLink()}>
+              Copy link
+            </Button>
+          ) : null}
+          {published ? (
+            <a href={liveHref(savedSlug)} target="_blank" rel="noreferrer">
+              <Button type="button" variant="outline">Open live</Button>
+            </a>
+          ) : null}
+          <Button type="button" onClick={() => void handlePublish()} disabled={pending || Boolean(draftIssue)}>
+            {unpublished ? "Publish changes" : "Publish"}
+          </Button>
+        </div>
       </div>
       <Tabs defaultValue="submissions">
         <TabsList>
@@ -200,26 +254,30 @@ export function Editor({ form }: { form: EditorForm }) {
             <Button type="submit" variant="outline">Save email</Button>
           </form>
           <p className="text-sm text-muted-foreground">New submissions are emailed here. The inbox keeps a copy either way.</p>
+          <Input aria-label="Search submissions" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search responses" />
           <div className="grid gap-4 lg:grid-cols-2">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="py-2">Submitted</th>
-                    <th>Version</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {submissions.map((row) => (
-                    <tr key={row.id} className="border-b">
-                      <td className="py-2">
-                        <button type="button" className="underline" onClick={() => setSelectedId(row.id)}>{new Date(row.createdAt).toLocaleString()}</button>
-                      </td>
-                      <td>{form.versions.find((version) => version.id === row.formVersionId)?.versionNumber ?? ""}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div>
+              {visibleSubmissions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">{submissions.length === 0 ? "No submissions yet." : "No matching responses."}</p>
+              ) : (
+              <ul className="divide-y rounded-lg border">
+                {visibleSubmissions.map((row) => {
+                  const version = form.versions.find((item) => item.id === row.formVersionId)?.spec ?? null;
+                  const identity = submissionIdentity(version, row.payload);
+                  return (
+                    <li key={row.id}>
+                      <button type="button" className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => setSelectedId(row.id)}>
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium">{identity.title}</span>
+                          {identity.detail ? <span className="block truncate text-muted-foreground">{identity.detail}</span> : null}
+                        </span>
+                        <span className="shrink-0 text-muted-foreground">{formatResponseTime(row.createdAt)}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              )}
               {nextCursor ? (
                 <Button
                   type="button"
@@ -237,28 +295,41 @@ export function Editor({ form }: { form: EditorForm }) {
               ) : null}
             </div>
             {selected ? (
-              <div className="space-y-3">
-                <pre className="overflow-auto rounded-lg border p-3 text-xs">{JSON.stringify(selected.payload, null, 2)}</pre>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    void exportSubmissionsCsv(form.id).then((csv) => {
-                      const blob = new Blob([csv], { type: "text/csv" });
-                      const url = URL.createObjectURL(blob);
-                      const link = document.createElement("a");
-                      link.href = url;
-                      link.download = `${slug}.csv`;
-                      link.click();
-                      URL.revokeObjectURL(url);
-                    }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not export submissions."));
-                  }}
-                >
-                  Download CSV
-                </Button>
-                <Button type="button" variant="outline" onClick={() => void deleteSubmission(form.id, selected.id).then(() => router.refresh())}>Delete</Button>
+              <div className="space-y-4">
+                <div>
+                  <p className="font-medium">{submissionIdentity(selectedSpec, selected.payload).title}</p>
+                  <p className="text-sm text-muted-foreground">{formatResponseTime(selected.createdAt)}</p>
+                </div>
+                <dl className="space-y-3">
+                  {labeledAnswers(selectedSpec, selected.payload).map((answer) => (
+                    <div key={answer.id}>
+                      <dt className="text-sm text-muted-foreground">{answer.label}</dt>
+                      <dd>{answer.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      void exportSubmissionsCsv(form.id).then((csv) => {
+                        const blob = new Blob([csv], { type: "text/csv" });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement("a");
+                        link.href = url;
+                        link.download = `${slug}.csv`;
+                        link.click();
+                        URL.revokeObjectURL(url);
+                      }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not export submissions."));
+                    }}
+                  >
+                    Download CSV
+                  </Button>
+                  <Button type="button" variant="outline" onClick={() => void deleteSubmission(form.id, selected.id).then(() => router.refresh())}>Delete</Button>
+                </div>
               </div>
-            ) : <p className="text-muted-foreground">No submissions yet.</p>}
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
             {form.versions.map((version) => (
