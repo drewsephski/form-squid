@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { AnimateHeight } from "@/components/ui/animate-height";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,31 +58,33 @@ export function AuthForm({ mode }: AuthFormProps) {
   }
 
   return (
-    <form
-      className="mx-auto grid w-full max-w-sm gap-4"
-      onSubmit={(event) => {
-        event.preventDefault();
-        void handleSubmit();
-      }}
-    >
-      {mode === "sign-up" ? (
+    <AnimateHeight>
+      <form
+        className="mx-auto grid w-full max-w-sm gap-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void handleSubmit();
+        }}
+      >
+        {mode === "sign-up" ? (
+          <div className="grid gap-2">
+            <Label htmlFor="name">Name</Label>
+            <Input id="name" value={name} onChange={(event) => setName(event.target.value)} required />
+          </div>
+        ) : null}
         <div className="grid gap-2">
-          <Label htmlFor="name">Name</Label>
-          <Input id="name" value={name} onChange={(event) => setName(event.target.value)} required />
+          <Label htmlFor="email">Email</Label>
+          <Input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
         </div>
-      ) : null}
-      <div className="grid gap-2">
-        <Label htmlFor="email">Email</Label>
-        <Input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor="password">Password</Label>
-        <Input id="password" type="password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} required />
-      </div>
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      <Button type="submit" disabled={pending}>
-        {mode === "sign-up" ? "Create account" : "Sign in"}
-      </Button>
-    </form>
+        <div className="grid gap-2">
+          <Label htmlFor="password">Password</Label>
+          <Input id="password" type="password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} required />
+        </div>
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        <Button type="submit" disabled={pending}>
+          {mode === "sign-up" ? "Create account" : "Sign in"}
+        </Button>
+      </form>
+    </AnimateHeight>
   );
 }

@@ -20,6 +20,7 @@ import { appOrigin, hostedHost, hostedUrl } from "@/app/lib/origin";
 import { labeledAnswers, submissionIdentity, submissionSearchText } from "@/app/lib/submission-display";
 import { formatPublished, formatResponseTime } from "@/lib/formatter";
 import { CodeBlock } from "@/components/ui/code-block";
+import { AnimateHeight } from "@/components/ui/animate-height";
 import { AppearanceSettings } from "@/app/ui/appearance-settings";
 import { FieldsInspector, FormSettings } from "@/app/ui/editor-inspector";
 import { FormView } from "@/app/ui/form-view";
@@ -205,9 +206,11 @@ export function Editor({ form }: { form: EditorForm }) {
             </Button>
           </div>
           <div className={previewDevice === "mobile" ? "mx-auto w-[390px] max-w-full" : "min-w-0"}>
-            <div className="min-w-0 overflow-x-auto rounded-xl border bg-muted/30 p-6">
-              <FormView spec={spec} preview />
-            </div>
+            <AnimateHeight>
+              <div className="min-w-0 overflow-x-auto rounded-xl border bg-muted/30 p-6">
+                <FormView spec={spec} preview />
+              </div>
+            </AnimateHeight>
           </div>
         </div>
         <Tabs defaultValue="ai" className="min-w-0">
@@ -220,23 +223,31 @@ export function Editor({ form }: { form: EditorForm }) {
           <TabsContent value="ai" className="min-w-0 space-y-3">
             <Textarea aria-label="Edit instruction" value={instruction} onChange={(event) => setInstruction(event.target.value)} placeholder="Split this into two steps." />
             <Button type="button" onClick={() => void handleEdit()} disabled={pending}>Ask FormSquid</Button>
-            {candidate ? (
-              <div className="space-y-2 rounded-lg border p-3 text-sm">
-                {describeSpecChange(spec, candidate).map((line) => (
-                  <p key={line}>{line}</p>
-                ))}
-                <Button type="button" onClick={() => { setSpec(candidate); setCandidate(null); }}>Apply</Button>
-              </div>
-            ) : null}
+            <AnimateHeight>
+              {candidate ? (
+                <div className="space-y-2 rounded-lg border p-3 text-sm">
+                  {describeSpecChange(spec, candidate).map((line) => (
+                    <p key={line}>{line}</p>
+                  ))}
+                  <Button type="button" onClick={() => { setSpec(candidate); setCandidate(null); }}>Apply</Button>
+                </div>
+              ) : null}
+            </AnimateHeight>
           </TabsContent>
           <TabsContent value="fields" className="min-w-0">
-            <FieldsInspector spec={spec} slug={slug} selectedId={selectedFieldId} onSpec={setSpec} onSlug={setSlug} onSelect={setSelectedFieldId} />
+            <AnimateHeight>
+              <FieldsInspector spec={spec} slug={slug} selectedId={selectedFieldId} onSpec={setSpec} onSlug={setSlug} onSelect={setSelectedFieldId} />
+            </AnimateHeight>
           </TabsContent>
           <TabsContent value="form" className="min-w-0">
-            <FormSettings spec={spec} slug={slug} selectedId={selectedFieldId} onSpec={setSpec} onSlug={setSlug} onSelect={setSelectedFieldId} />
+            <AnimateHeight>
+              <FormSettings spec={spec} slug={slug} selectedId={selectedFieldId} onSpec={setSpec} onSlug={setSlug} onSelect={setSelectedFieldId} />
+            </AnimateHeight>
           </TabsContent>
           <TabsContent value="appearance" className="min-w-0">
-            <AppearanceSettings spec={spec} onSpec={setSpec} />
+            <AnimateHeight>
+              <AppearanceSettings spec={spec} onSpec={setSpec} />
+            </AnimateHeight>
           </TabsContent>
         </Tabs>
       </div>
@@ -403,12 +414,14 @@ export function Editor({ form }: { form: EditorForm }) {
                   );
                 })}
               </ul>
-              {previewVersion?.spec ? (
-                <div className="rounded-xl border p-6">
-                  <p className="mb-4 text-sm text-muted-foreground">Preview of v{previewVersion.versionNumber}</p>
-                  <FormView spec={previewVersion.spec} preview />
-                </div>
-              ) : null}
+              <AnimateHeight>
+                {previewVersion?.spec ? (
+                  <div className="rounded-xl border p-6">
+                    <p className="mb-4 text-sm text-muted-foreground">Preview of v{previewVersion.versionNumber}</p>
+                    <FormView spec={previewVersion.spec} preview />
+                  </div>
+                ) : null}
+              </AnimateHeight>
             </div>
           ) : null}
         </TabsContent>

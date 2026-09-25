@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { AnimateHeight } from "@/components/ui/animate-height";
 import { Button } from "@/components/ui/button";
 import { saveForm } from "@/app/lib/actions/forms-write";
 import { currentReferrer, trackFunnel, type FunnelProperties } from "@/app/lib/analytics";
@@ -51,11 +52,13 @@ export function UseTemplateButton({
   }
 
   return (
-    <div className="space-y-2">
-      <Button type="button" className="h-11 rounded-full px-6" onClick={() => void handleUse()} disabled={pending}>
-        {pending ? "Creating form" : label}
-      </Button>
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-    </div>
+    <AnimateHeight>
+      <div className="space-y-2">
+        <Button type="button" className="h-11 rounded-full px-6" onClick={() => void handleUse()} disabled={pending}>
+          {pending ? "Creating form" : label}
+        </Button>
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      </div>
+    </AnimateHeight>
   );
 }

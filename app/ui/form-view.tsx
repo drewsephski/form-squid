@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import { AnimateHeight } from "@/components/ui/animate-height";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -121,16 +122,18 @@ export function FormView({ spec, submitUrl, preview = false }: FormViewProps) {
     }
   }
 
-  if (done) {
-    if (preview) {
-      return (
-        <div className={`${frameClass} space-y-4 rounded-xl px-6 py-8 text-center`} style={frameStyle} data-formsquid-theme={appearance.theme} role="status">
-          <p className="text-lg">Save and publish first to receive feedback.</p>
-          <p className="text-sm text-muted-foreground">This is a preview. Submissions are collected after you publish the form.</p>
-        </div>
-      );
-    }
-    return (
+  const progress = ((stepIndex + 1) / spec.steps.length) * 100;
+
+  let body: ReactNode;
+  if (done && preview) {
+    body = (
+      <div className={`${frameClass} space-y-4 rounded-xl px-6 py-8 text-center`} style={frameStyle} data-formsquid-theme={appearance.theme} role="status">
+        <p className="text-lg">Save and publish first to receive feedback.</p>
+        <p className="text-sm text-muted-foreground">This is a preview. Submissions are collected after you publish the form.</p>
+      </div>
+    );
+  } else if (done) {
+    body = (
       <div className={`${frameClass} space-y-4 rounded-xl px-6 py-8 text-center`} style={frameStyle} data-formsquid-theme={appearance.theme}>
         <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-primary/15 text-lg text-primary" aria-hidden="true">
           ✓
@@ -144,71 +147,71 @@ export function FormView({ spec, submitUrl, preview = false }: FormViewProps) {
         </p>
       </div>
     );
+  } else {
+    body = (
+      <form
+        className={`${frameClass} space-y-6 rounded-xl px-6 py-6`}
+        style={frameStyle}
+        data-formsquid-theme={appearance.theme}
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (stepIndex < spec.steps.length - 1) {
+            handleNext();
+            return;
+          }
+          void handleSubmit();
+        }}
+      >
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">{spec.title}</h1>
+          {spec.description ? <p className="text-muted-foreground">{spec.description}</p> : null}
+        </div>
+        {spec.steps.length > 1 ? (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Step {stepIndex + 1} of {spec.steps.length}
+            </p>
+            <h2 className="text-lg font-medium">{step.title}</h2>
+            <div className="h-1 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+              <div className="h-full bg-foreground transition-all" style={{ width: `${progress}%` }} />
+            </div>
+          </div>
+        ) : (
+          <h2 className="text-lg font-medium">{step.title}</h2>
+        )}
+        {step.fields.filter(visible).map((field) => (
+          <FieldControl
+            key={field.id}
+            field={field}
+            value={values[field.id]}
+            error={errors[field.id]}
+            onChange={(value) => handleValue(field.id, value)}
+          />
+        ))}
+        <input
+          className="hidden"
+          tabIndex={-1}
+          autoComplete="off"
+          aria-hidden="true"
+          value={honeypot}
+          onChange={(event) => setHoneypot(event.target.value)}
+        />
+        <div className="flex gap-2">
+          {stepIndex > 0 ? (
+            <Button type="button" variant="outline" onClick={() => setStepIndex((current) => current - 1)}>
+              Back
+            </Button>
+          ) : null}
+          <Button type="submit" className={actionClass} disabled={pending}>
+            {pending ? "Sending…" : stepIndex < spec.steps.length - 1 ? "Next" : spec.submitLabel}
+          </Button>
+        </div>
+        {submitError ? <p role="alert" className="text-sm text-destructive">{submitError}</p> : null}
+      </form>
+    );
   }
 
-  const progress = ((stepIndex + 1) / spec.steps.length) * 100;
-
-  return (
-    <form
-      className={`${frameClass} space-y-6 rounded-xl px-6 py-6`}
-      style={frameStyle}
-      data-formsquid-theme={appearance.theme}
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (stepIndex < spec.steps.length - 1) {
-          handleNext();
-          return;
-        }
-        void handleSubmit();
-      }}
-    >
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">{spec.title}</h1>
-        {spec.description ? <p className="text-muted-foreground">{spec.description}</p> : null}
-      </div>
-      {spec.steps.length > 1 ? (
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Step {stepIndex + 1} of {spec.steps.length}
-          </p>
-          <h2 className="text-lg font-medium">{step.title}</h2>
-          <div className="h-1 overflow-hidden rounded-full bg-muted" aria-hidden="true">
-            <div className="h-full bg-foreground transition-all" style={{ width: `${progress}%` }} />
-          </div>
-        </div>
-      ) : (
-        <h2 className="text-lg font-medium">{step.title}</h2>
-      )}
-      {step.fields.filter(visible).map((field) => (
-        <FieldControl
-          key={field.id}
-          field={field}
-          value={values[field.id]}
-          error={errors[field.id]}
-          onChange={(value) => handleValue(field.id, value)}
-        />
-      ))}
-      <input
-        className="hidden"
-        tabIndex={-1}
-        autoComplete="off"
-        aria-hidden="true"
-        value={honeypot}
-        onChange={(event) => setHoneypot(event.target.value)}
-      />
-      <div className="flex gap-2">
-        {stepIndex > 0 ? (
-          <Button type="button" variant="outline" onClick={() => setStepIndex((current) => current - 1)}>
-            Back
-          </Button>
-        ) : null}
-        <Button type="submit" className={actionClass} disabled={pending}>
-          {pending ? "Sending…" : stepIndex < spec.steps.length - 1 ? "Next" : spec.submitLabel}
-        </Button>
-      </div>
-      {submitError ? <p role="alert" className="text-sm text-destructive">{submitError}</p> : null}
-    </form>
-  );
+  return <AnimateHeight>{body}</AnimateHeight>;
 }
 
 interface FieldControlProps {
