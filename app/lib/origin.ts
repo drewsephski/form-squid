@@ -5,12 +5,20 @@ export function appOrigin() {
 const productionApiOrigin = "https://api.formsquid.com";
 
 export function submitUrlFor(slug: string) {
+  return `${apiOriginFor()}/forms/${slug}/submissions`;
+}
+
+export function uploadUrlFor(slug: string) {
+  return `${apiOriginFor()}/forms/${slug}/uploads`;
+}
+
+function apiOriginFor() {
   const configured = process.env.FORM_API_ORIGIN?.replace(/\/$/, "");
   const apiOrigin = configured || (process.env.NODE_ENV === "production" ? productionApiOrigin : "");
   if (!apiOrigin) {
     throw new Error("FORM_API_ORIGIN must be configured.");
   }
-  return `${apiOrigin}/forms/${slug}/submissions`;
+  return apiOrigin;
 }
 
 export function hostedHost(slug: string) {

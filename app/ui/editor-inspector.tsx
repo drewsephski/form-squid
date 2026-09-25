@@ -30,9 +30,11 @@ import {
   renameStep,
   setVisibleWhen,
   updateField,
+  updateFileField,
   updateOptionLabel,
 } from "@/app/lib/edit-spec";
 import type { FormField } from "@/app/lib/definitions";
+import { freePlanLimits } from "@/app/lib/upload-limits";
 
 interface EditorInspectorProps {
   spec: FormSpec;
@@ -169,7 +171,7 @@ export function FieldsInspector({ spec, selectedId, onSpec, onSelect }: EditorIn
           <Label htmlFor="field-label">Label</Label>
           <Input id="field-label" value={selected.label} onChange={(event) => onSpec(updateField(spec, selected.id, { label: event.target.value }))} />
         </div>
-        {selected.type !== "checkbox" && selected.type !== "radio" ? (
+        {selected.type !== "checkbox" && selected.type !== "radio" && selected.type !== "file" ? (
           <div className="grid gap-2">
             <Label htmlFor="field-placeholder">Placeholder</Label>
             <Input
@@ -177,6 +179,71 @@ export function FieldsInspector({ spec, selectedId, onSpec, onSelect }: EditorIn
               value={selected.placeholder ?? ""}
               onChange={(event) => onSpec(updateField(spec, selected.id, { placeholder: event.target.value || undefined }))}
             />
+          </div>
+        ) : null}
+        {selected.type === "file" ? (
+          <div className="grid gap-3 rounded-lg border p-3">
+            <p className="text-sm font-medium">File upload</p>
+            <div className="grid gap-2">
+              <Label htmlFor="file-max-files">Max files</Label>
+              <Select
+                items={[
+                  { value: "1", label: "1 file" },
+                  { value: "5", label: "Up to 5 files" },
+                ]}
+                value={String(selected.maxFiles === 5 ? 5 : 1)}
+                onValueChange={(value) => {
+                  if (value === "1" || value === "5") {
+                    onSpec(updateFileField(spec, selected.id, { maxFiles: Number(value) as 1 | 5 }));
+                  }
+                }}
+              >
+                <SelectTrigger id="file-max-files" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 file</SelectItem>
+                  <SelectItem value="5">Up to 5 files</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="file-max-size">Max size (MB)</Label>
+              <Input
+                id="file-max-size"
+                type="number"
+                min={1}
+                max={freePlanLimits.maxFileSizeMb}
+                value={selected.maxFileSizeMb ?? freePlanLimits.maxFileSizeMb}
+                onChange={(event) => {
+                  const parsed = Number(event.target.value);
+                  if (!Number.isFinite(parsed)) {
+                    return;
+                  }
+                  onSpec(
+                    updateFileField(spec, selected.id, {
+                      maxFileSizeMb: Math.min(Math.max(1, Math.floor(parsed)), freePlanLimits.maxFileSizeMb),
+                    }),
+                  );
+                }}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="file-accept">Accepted MIME types</Label>
+              <Textarea
+                id="file-accept"
+                placeholder="application/pdf, image/png"
+                value={(selected.accept ?? []).join(", ")}
+                onChange={(event) => {
+                  const accept = event.target.value
+                    .split(",")
+                    .map((part) => part.trim())
+                    .filter(Boolean);
+                  onSpec(updateFileField(spec, selected.id, { accept: accept.length > 0 ? accept : undefined }));
+                }}
+              />
+              <p className="text-xs text-muted-foreground">Leave blank for the default document and image allowlist.</p>
+            </div>
           </div>
         ) : null}
         <div className="grid gap-2">

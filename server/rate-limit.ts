@@ -32,7 +32,7 @@ export function hashClientAddress(address: string, salt: string) {
 
 export async function reserveSubmissionAttempt(
   database: RateLimitDatabase,
-  input: { formId: string; actorHash: string; now: Date },
+  input: { formId: string; actorHash: string; now: Date; maxAttempts?: number },
 ) {
   const start = bucketStart(input.now);
   const [row] = await database
@@ -50,9 +50,10 @@ export async function reserveSubmissionAttempt(
     .returning({ attempts: submissionRateBuckets.attempts });
 
   const attempts = row?.attempts ?? 1;
+  const maxAttempts = input.maxAttempts ?? maxSubmissionAttemptsPerMinute;
   const retryAfter = Math.max(1, 60 - input.now.getUTCSeconds());
   return {
-    allowed: attempts <= maxSubmissionAttemptsPerMinute,
+    allowed: attempts <= maxAttempts,
     attempts,
     retryAfter,
   };

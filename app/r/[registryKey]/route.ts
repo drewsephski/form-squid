@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { compileForm } from "@/app/lib/compiler";
-import { submitUrlFor } from "@/app/lib/origin";
+import { submitUrlFor, uploadUrlFor } from "@/app/lib/origin";
 import { getPublishedByRegistryKey } from "@/app/lib/published";
 
 export async function GET(_request: Request, context: { params: Promise<{ registryKey: string }> }) {
@@ -11,7 +11,11 @@ export async function GET(_request: Request, context: { params: Promise<{ regist
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const compiled = compileForm(published.spec, { submission: "formsquid", url: submitUrlFor(published.slug) });
+  const compiled = compileForm(published.spec, {
+    submission: "formsquid",
+    url: submitUrlFor(published.slug),
+    uploadUrl: uploadUrlFor(published.slug),
+  });
   return NextResponse.json({
     $schema: "https://ui.shadcn.com/schema/registry-item.json",
     name: published.slug,

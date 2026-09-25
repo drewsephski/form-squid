@@ -134,3 +134,28 @@ export const webhookDeliveries = pgTable(
     index("webhook_deliveries_submission_idx").on(table.submissionId),
   ],
 );
+
+export const submissionFiles = pgTable(
+  "submission_files",
+  {
+    id: text("id").primaryKey(),
+    formId: text("form_id")
+      .notNull()
+      .references(() => forms.id, { onDelete: "cascade" }),
+    submissionId: text("submission_id").references(() => submissions.id, { onDelete: "cascade" }),
+    fieldId: text("field_id").notNull(),
+    storageKey: text("storage_key").notNull(),
+    originalFilename: text("original_filename").notNull(),
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    actorHash: text("actor_hash").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("submission_files_storage_key_unique").on(table.storageKey),
+    index("submission_files_form_id_idx").on(table.formId),
+    index("submission_files_submission_id_idx").on(table.submissionId),
+    index("submission_files_pending_created_idx").on(table.createdAt),
+    index("submission_files_form_actor_idx").on(table.formId, table.actorHash),
+  ],
+);

@@ -3,7 +3,9 @@
 import { and, count, desc, eq, inArray, lt, or } from "drizzle-orm";
 import { db } from "@/db";
 import { formVersions, formWebhooks, forms, submissions } from "@/db/schema";
+import { csvFileCell } from "@/app/lib/submission-display";
 import { formSpecSchema } from "@/app/lib/definitions";
+import { isSubmissionFileRef } from "@/app/lib/file-field";
 import { hostedHost } from "@/app/lib/origin";
 import { requireFormOwner, requireUser } from "@/app/lib/auth-guards";
 import { listRecentDeliveries } from "@/server/webhooks/deliver";
@@ -163,6 +165,9 @@ export async function loadSubmissions(formId: string, cursor: string) {
 }
 
 function csvCell(value: unknown) {
+  if (isSubmissionFileRef(value) || (Array.isArray(value) && value.some(isSubmissionFileRef))) {
+    return `"${csvFileCell(value).replaceAll('"', '""')}"`;
+  }
   const text = value === undefined || value === null ? "" : typeof value === "string" ? value : JSON.stringify(value);
   return `"${text.replaceAll('"', '""')}"`;
 }

@@ -1,4 +1,5 @@
 import type { FormSpec } from "./definitions";
+import { formatFileSize, isSubmissionFileRef } from "./file-field";
 
 export interface LabeledAnswer {
   id: string;
@@ -23,19 +24,43 @@ function textValue(value: unknown) {
   return "";
 }
 
+function fileAnswerValue(value: unknown): string {
+  const items = Array.isArray(value) ? value : value === undefined || value === null ? [] : [value];
+  const parts = items
+    .filter(isSubmissionFileRef)
+    .map((file) => `${file.name} · ${formatFileSize(file.size)}`);
+  return parts.join("\n") || "—";
+}
+
+export function fileRefsFromValue(value: unknown) {
+  const items = Array.isArray(value) ? value : value === undefined || value === null ? [] : [value];
+  return items.filter(isSubmissionFileRef);
+}
+
+export function csvFileCell(value: unknown) {
+  const refs = fileRefsFromValue(value);
+  if (refs.length === 0) {
+    return "";
+  }
+  return refs.map((file) => `${file.name} (${file.id})`).join("; ");
+}
+
 export function labeledAnswers(spec: FormSpec | null, payload: unknown): LabeledAnswer[] {
   const data = isRecord(payload) ? payload : {};
   if (!spec) {
     return Object.entries(data).map(([id, value]) => ({
       id,
       label: id,
-      value: textValue(value) || "—",
+      value: fileRefsFromValue(value).length > 0 ? fileAnswerValue(value) : textValue(value) || "—",
     }));
   }
 
   return spec.steps.flatMap((step) =>
     step.fields.map((field) => {
       const raw = data[field.id];
+      if (field.type === "file") {
+        return { id: field.id, label: field.label, value: fileAnswerValue(raw) };
+      }
       let value = textValue(raw);
       if ((field.type === "select" || field.type === "radio") && typeof raw === "string") {
         value = field.options?.find((option) => option.value === raw)?.label ?? value;
@@ -66,4 +91,3 @@ export function submissionSearchText(spec: FormSpec | null, payload: unknown) {
     .join(" ")
     .toLowerCase();
 }
-

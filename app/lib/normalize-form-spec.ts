@@ -25,6 +25,9 @@ export function normalizeFormSpec(input: unknown): FormSpec {
         required: field.required,
         options: omitNull(field.options),
         visibleWhen: omitNull(field.visibleWhen),
+        maxFiles: omitNull(field.maxFiles ?? null),
+        maxFileSizeMb: omitNull(field.maxFileSizeMb ?? null),
+        accept: omitNull(field.accept ?? null),
       })),
     })),
   });

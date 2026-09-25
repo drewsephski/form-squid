@@ -13,6 +13,7 @@ export const fieldTypes = [
   "radio",
   "checkbox",
   "date",
+  "file",
 ] as const;
 
 export type FieldType = (typeof fieldTypes)[number];
@@ -31,6 +32,8 @@ export const visibleWhenSchema = z.object({
   equals: z.string().max(200),
 });
 
+export const fileMaxFilesSchema = z.union([z.literal(1), z.literal(5)]);
+
 export const fieldSchema = z.object({
   id: fieldIdSchema,
   type: z.enum(fieldTypes),
@@ -40,6 +43,9 @@ export const fieldSchema = z.object({
   required: z.boolean(),
   options: z.array(optionSchema).max(20).optional(),
   visibleWhen: visibleWhenSchema.optional(),
+  maxFiles: fileMaxFilesSchema.optional(),
+  maxFileSizeMb: z.number().int().positive().max(25).optional(),
+  accept: z.array(plainText(100)).max(20).optional(),
 });
 
 export const stepSchema = z.object({
@@ -128,6 +134,22 @@ export const formSpecSchema = z
         });
       }
 
+      if (field.type === "file") {
+        if (field.accept && field.accept.length === 0) {
+          context.addIssue({
+            code: "custom",
+            message: "File accept list cannot be empty.",
+            path: ["steps"],
+          });
+        }
+      } else if (field.maxFiles !== undefined || field.maxFileSizeMb !== undefined || field.accept !== undefined) {
+        context.addIssue({
+          code: "custom",
+          message: "Only file fields have upload settings.",
+          path: ["steps"],
+        });
+      }
+
       if (!field.visibleWhen) {
         return;
       }
@@ -197,6 +219,9 @@ export const aiFieldSchema = z.object({
   required: z.boolean(),
   options: z.array(aiOptionSchema).nullable(),
   visibleWhen: aiVisibleWhenSchema.nullable(),
+  maxFiles: z.union([z.literal(1), z.literal(5), z.null()]).optional(),
+  maxFileSizeMb: z.number().nullable().optional(),
+  accept: z.array(z.string()).nullable().optional(),
 });
 
 export const aiFormSpecSchema = z.object({
@@ -219,8 +244,26 @@ export const aiFormSpecSchema = z.object({
 
 export type AiFormSpec = z.infer<typeof aiFormSpecSchema>;
 
-export type SubmissionValue = string | number | boolean;
+export const submissionFileRefSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(200),
+  contentType: z.string().min(1).max(200),
+  size: z.number().int().nonnegative(),
+});
+
+export type SubmissionFileRef = z.infer<typeof submissionFileRefSchema>;
+
+export type SubmissionValue =
+  | string
+  | number
+  | boolean
+  | SubmissionFileRef
+  | SubmissionFileRef[]
+  | string[];
 export type SubmissionData = Record<string, SubmissionValue>;
+
+/** Client submits opaque upload ids; server normalizes to SubmissionFileRef. */
+export type SubmissionFileInput = string | string[];
 
 export type SubmissionError = {
   path: string;

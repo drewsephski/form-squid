@@ -11,14 +11,16 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { appearanceClassName, appearanceStyle, resolveAppearance, submitClassName, submitSlotClassName } from "@/app/lib/appearance";
-import { honeypotField, type FormField, type FormSpec, type SubmissionData } from "@/app/lib/definitions";
+import { honeypotField, type FormField, type FormSpec, type SubmissionValue } from "@/app/lib/definitions";
 import { parseNumberInput } from "@/app/lib/number-input";
 import { fieldIsVisible } from "@/app/lib/submission-algorithm";
 import { validateSubmission } from "@/app/lib/validate-submission";
+import { FileFieldControl, submissionValueFromFiles, type UploadedFileValue } from "@/app/ui/file-field-control";
 
 interface FormViewProps {
   spec: FormSpec;
   submitUrl?: string;
+  uploadUrl?: string;
   preview?: boolean;
   /** Tighter padding/spacing for thumbnail card previews. */
   compact?: boolean;
@@ -26,9 +28,11 @@ interface FormViewProps {
   idPrefix?: string;
 }
 
-export function FormView({ spec, submitUrl, preview = false, compact = false, idPrefix = "" }: FormViewProps) {
+type FormValue = SubmissionValue | UploadedFileValue | UploadedFileValue[] | File | File[];
+
+export function FormView({ spec, submitUrl, uploadUrl, preview = false, compact = false, idPrefix = "" }: FormViewProps) {
   const [stepIndex, setStepIndex] = useState(0);
-  const [values, setValues] = useState<Record<string, string | number | boolean>>({});
+  const [values, setValues] = useState<Record<string, FormValue>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [honeypot, setHoneypot] = useState("");
   const [done, setDone] = useState(false);
@@ -45,7 +49,23 @@ export function FormView({ spec, submitUrl, preview = false, compact = false, id
     return null;
   }
 
-  function handleValue(id: string, value: string | number | boolean | undefined) {
+  function payloadFromValues() {
+    const payload: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(values)) {
+      const field = spec.steps.flatMap((item) => item.fields).find((item) => item.id === key);
+      if (field?.type === "file") {
+        const next = submissionValueFromFiles(value as UploadedFileValue | UploadedFileValue[] | File | File[] | undefined);
+        if (next !== undefined) {
+          payload[key] = next;
+        }
+        continue;
+      }
+      payload[key] = value;
+    }
+    return payload;
+  }
+
+  function handleValue(id: string, value: FormValue | undefined) {
     setValues((current) => {
       if (value === undefined) {
         const next = { ...current };
@@ -83,7 +103,7 @@ export function FormView({ spec, submitUrl, preview = false, compact = false, id
   }
 
   function handleNext() {
-    const result = validateSubmission(spec, values, { stepId: step.id });
+    const result = validateSubmission(spec, payloadFromValues(), { stepId: step.id });
     if (!result.ok) {
       showErrors(Object.fromEntries(result.errors.filter((error) => error.path).map((error) => [error.path, error.message])));
       return;
@@ -93,7 +113,7 @@ export function FormView({ spec, submitUrl, preview = false, compact = false, id
   }
 
   async function handleSubmit() {
-    const result = validateSubmission(spec, values);
+    const result = validateSubmission(spec, payloadFromValues());
     if (!result.ok) {
       showErrors(Object.fromEntries(result.errors.filter((error) => error.path).map((error) => [error.path, error.message])));
       return;
@@ -191,6 +211,8 @@ export function FormView({ spec, submitUrl, preview = false, compact = false, id
             idPrefix={idPrefix}
             value={values[field.id]}
             error={errors[field.id]}
+            uploadUrl={uploadUrl}
+            hosted={Boolean(submitUrl) && !preview}
             onChange={(value) => handleValue(field.id, value)}
           />
         ))}
@@ -229,12 +251,14 @@ export function FormView({ spec, submitUrl, preview = false, compact = false, id
 interface FieldControlProps {
   field: FormField;
   idPrefix?: string;
-  value: SubmissionData[string] | undefined;
+  value: FormValue | undefined;
   error?: string;
-  onChange: (value: string | number | boolean | undefined) => void;
+  uploadUrl?: string;
+  hosted: boolean;
+  onChange: (value: FormValue | undefined) => void;
 }
 
-function FieldControl({ field, idPrefix = "", value, error, onChange }: FieldControlProps) {
+function FieldControl({ field, idPrefix = "", value, error, uploadUrl, hosted, onChange }: FieldControlProps) {
   const id = `${idPrefix}field-${field.id}`;
   return (
     <div className="grid gap-2" data-field={field.id}>
@@ -242,6 +266,17 @@ function FieldControl({ field, idPrefix = "", value, error, onChange }: FieldCon
         {field.label}
         {field.required ? <span className="text-destructive"> *</span> : null}
       </Label>
+      {field.type === "file" ? (
+        <FileFieldControl
+          field={field}
+          id={id}
+          uploadUrl={uploadUrl}
+          hosted={hosted}
+          value={value as UploadedFileValue | UploadedFileValue[] | File | File[] | undefined}
+          error={error}
+          onChange={onChange}
+        />
+      ) : null}
       {field.type === "textarea" ? (
         <Textarea id={id} placeholder={field.placeholder} value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)} aria-invalid={Boolean(error)} aria-required={field.required} />
       ) : null}
@@ -298,7 +333,7 @@ function FieldControl({ field, idPrefix = "", value, error, onChange }: FieldCon
         />
       ) : null}
       {field.description ? <p className="text-sm text-muted-foreground">{field.description}</p> : null}
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {field.type !== "file" && error ? <p className="text-sm text-destructive">{error}</p> : null}
     </div>
   );
 }

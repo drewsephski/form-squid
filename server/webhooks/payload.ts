@@ -1,4 +1,5 @@
 import type { FormSpec, SubmissionData } from "../../app/lib/definitions";
+import { sampleFileRef } from "../../app/lib/sample-file-ref";
 
 export const submissionCreatedEvent = "submission.created" as const;
 export const submissionTestEvent = "submission.test" as const;
@@ -83,6 +84,9 @@ export function sampleSubmissionData(spec: FormSpec): SubmissionData {
         break;
       case "textarea":
         data[field.id] = "Example response";
+        break;
+      case "file":
+        data[field.id] = sampleFileRef(field);
         break;
       default:
         data[field.id] = field.label.toLowerCase().includes("name") ? "Example response" : "Example response";

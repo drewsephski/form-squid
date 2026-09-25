@@ -17,6 +17,7 @@ import { formVersions, forms, submissions } from "../db/schema";
 import { senderAddress, submissionNotificationEmail } from "./mail";
 import { reserveSubmissionAttempt } from "./rate-limit";
 import type { SubmissionEvent } from "./submission-log";
+import { attachUploadsToSubmission } from "./uploads";
 import type { SubmissionDispatch } from "./webhooks/payload";
 
 export type SubmitDatabase = NodePgDatabase<typeof schema>;
@@ -128,19 +129,64 @@ export async function submitForm(
   }
 
   const submissionId = randomUUID();
-  await database.insert(submissions).values({
-    id: submissionId,
-    formId: form.id,
-    formVersionId: version.id,
-    payload: result.data,
-    createdAt: now,
-  });
+  let storedData = result.data;
+
+  const fileFieldIds = new Set(
+    spec.steps.flatMap((step) => step.fields).filter((field) => field.type === "file").map((field) => field.id),
+  );
+  const needsUploadAttach = Object.keys(result.data).some((key) => fileFieldIds.has(key));
+
+  try {
+    if (needsUploadAttach) {
+      storedData = await database.transaction(async (tx) => {
+        const attached = await attachUploadsToSubmission(tx, {
+          formId: form.id,
+          submissionId,
+          actorHash: input.actorHash,
+          spec,
+          data: result.data,
+        });
+        if (!attached.ok) {
+          throw Object.assign(new Error("upload_attach_failed"), { errors: attached.errors });
+        }
+
+        await tx.insert(submissions).values({
+          id: submissionId,
+          formId: form.id,
+          formVersionId: version.id,
+          payload: attached.data,
+          createdAt: now,
+        });
+
+        return attached.data;
+      });
+    } else {
+      await database.insert(submissions).values({
+        id: submissionId,
+        formId: form.id,
+        formVersionId: version.id,
+        payload: result.data,
+        createdAt: now,
+      });
+    }
+  } catch (error) {
+    if (error && typeof error === "object" && "errors" in error) {
+      return respond(
+        400,
+        { ok: false, errors: (error as { errors: SubmissionError[] }).errors },
+        "submission.invalid",
+        "upload_attach",
+        form.id,
+      );
+    }
+    throw error;
+  }
 
   if (process.env.RESEND_API_KEY && form.notifyEmail) {
     try {
       const message = submissionNotificationEmail({
         formTitle: spec.title || input.slug,
-        answers: labeledAnswers(spec, result.data),
+        answers: labeledAnswers(spec, storedData),
         inboxUrl: `${appOrigin()}/forms/${form.id}`,
       });
       const resend = new Resend(process.env.RESEND_API_KEY);
@@ -165,7 +211,7 @@ export async function submitForm(
       formTitle: spec.title || form.slug,
       version: version.versionNumber,
       createdAt: now.toISOString(),
-      data: result.data,
+      data: storedData,
     },
   };
 }
