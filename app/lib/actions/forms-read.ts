@@ -109,6 +109,7 @@ export async function getForm(formId: string) {
   return {
     id: form.id,
     slug: form.slug,
+    draftSlug: form.draftSlug,
     notifyEmail: form.notifyEmail ?? "",
     registryKey: form.registryKey,
     draftSpec: formSpecSchema.parse(form.draftSpec),

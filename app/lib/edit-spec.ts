@@ -129,7 +129,7 @@ export function updateField(spec: FormSpec, fieldId: string, patch: Partial<Pick
 }
 
 export function changeFieldType(spec: FormSpec, fieldId: string, type: FieldType) {
-  return {
+  return clearStaleConditions({
     ...spec,
     steps: spec.steps.map((step) => ({
       ...step,
@@ -149,11 +149,98 @@ export function changeFieldType(spec: FormSpec, fieldId: string, type: FieldType
         };
       }),
     })),
+  });
+}
+
+function conditionValueOk(parent: FormField, equals: string) {
+  if (parent.type === "checkbox") {
+    return equals === "true" || equals === "false";
+  }
+  if (parent.type === "select" || parent.type === "radio") {
+    return parent.options?.some((option) => option.value === equals) ?? false;
+  }
+  if (parent.type === "number") {
+    const parsed = Number(equals);
+    return Number.isFinite(parsed) && JSON.stringify(parsed) === equals;
+  }
+  return true;
+}
+
+export function clearStaleConditions(spec: FormSpec): FormSpec {
+  const ordered = spec.steps.flatMap((step) => step.fields);
+  const kept = new Map<string, FormField["visibleWhen"]>();
+  ordered.forEach((field, index) => {
+    const rule = field.visibleWhen;
+    if (!rule) {
+      return;
+    }
+    const parent = ordered.slice(0, index).find((item) => item.id === rule.fieldId);
+    if (parent && conditionValueOk(parent, rule.equals)) {
+      kept.set(field.id, rule);
+    }
+  });
+
+  return {
+    ...spec,
+    steps: spec.steps.map((step) => ({
+      ...step,
+      fields: step.fields.map((field) => {
+        const next = kept.get(field.id);
+        if (next) {
+          return { ...field, visibleWhen: next };
+        }
+        if (!field.visibleWhen) {
+          return field;
+        }
+        const rest = { ...field };
+        delete rest.visibleWhen;
+        return rest;
+      }),
+    })),
   };
 }
 
-export function moveField(spec: FormSpec, fieldId: string, direction: -1 | 1) {
+export function defaultConditionEquals(parent: FormField) {
+  if (parent.type === "checkbox") {
+    return "true";
+  }
+  if (parent.type === "select" || parent.type === "radio") {
+    return parent.options?.[0]?.value ?? "";
+  }
+  if (parent.type === "number") {
+    return "0";
+  }
+  return "";
+}
+
+export function setVisibleWhen(spec: FormSpec, fieldId: string, visibleWhen: FormField["visibleWhen"]) {
   return {
+    ...spec,
+    steps: spec.steps.map((step) => ({
+      ...step,
+      fields: step.fields.map((field) => {
+        if (field.id !== fieldId) {
+          return field;
+        }
+        if (!visibleWhen) {
+          const rest = { ...field };
+          delete rest.visibleWhen;
+          return rest;
+        }
+        return { ...field, visibleWhen };
+      }),
+    })),
+  };
+}
+
+export function earlierFields(spec: FormSpec, fieldId: string) {
+  const ordered = spec.steps.flatMap((step) => step.fields);
+  const index = ordered.findIndex((field) => field.id === fieldId);
+  return index < 0 ? [] : ordered.slice(0, index);
+}
+
+export function moveField(spec: FormSpec, fieldId: string, direction: -1 | 1) {
+  return clearStaleConditions({
     ...spec,
     steps: spec.steps.map((step) => {
       const index = step.fields.findIndex((field) => field.id === fieldId);
@@ -169,7 +256,7 @@ export function moveField(spec: FormSpec, fieldId: string, direction: -1 | 1) {
       fields.splice(nextIndex, 0, item);
       return { ...step, fields };
     }),
-  };
+  });
 }
 
 export function deleteField(spec: FormSpec, fieldId: string) {
@@ -233,7 +320,7 @@ export function removeOption(spec: FormSpec, fieldId: string, index: number) {
     return { error: "Add at least one option." };
   }
   return {
-    spec: {
+    spec: clearStaleConditions({
       ...spec,
       steps: spec.steps.map((step) => ({
         ...step,
@@ -244,7 +331,7 @@ export function removeOption(spec: FormSpec, fieldId: string, index: number) {
           return { ...item, options: item.options.filter((_, optionIndex) => optionIndex !== index) };
         }),
       })),
-    },
+    }),
   };
 }
 
@@ -287,12 +374,12 @@ export function moveStep(spec: FormSpec, stepId: string, direction: -1 | 1) {
     return spec;
   }
   steps.splice(nextIndex, 0, item);
-  return { ...spec, steps };
+  return clearStaleConditions({ ...spec, steps });
 }
 
 export function deleteStep(spec: FormSpec, stepId: string) {
   if (spec.steps.length <= 1) {
     return { error: "A form needs at least one step." };
   }
-  return { spec: { ...spec, steps: spec.steps.filter((step) => step.id !== stepId) } };
+  return { spec: clearStaleConditions({ ...spec, steps: spec.steps.filter((step) => step.id !== stepId) }) };
 }

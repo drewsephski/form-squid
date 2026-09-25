@@ -24,6 +24,7 @@ import { FormView } from "@/app/ui/form-view";
 interface EditorForm {
   id: string;
   slug: string;
+  draftSlug: string;
   notifyEmail: string;
   registryKey: string;
   draftSpec: FormSpec;
@@ -45,9 +46,10 @@ function liveHref(slug: string) {
 export function Editor({ form }: { form: EditorForm }) {
   const router = useRouter();
   const [spec, setSpec] = useState(form.draftSpec);
-  const [slug, setSlug] = useState(form.slug);
+  const [slug, setSlug] = useState(form.draftSlug);
   const [savedSpec, setSavedSpec] = useState(form.draftSpec);
-  const [savedSlug, setSavedSlug] = useState(form.slug);
+  const [savedSlug, setSavedSlug] = useState(form.draftSlug);
+  const [publishedSlug, setPublishedSlug] = useState(form.slug);
   const [publishedSpec, setPublishedSpec] = useState(form.publishedSpec);
   const [publishedAt, setPublishedAt] = useState(form.publishedAt);
   const [saving, setSaving] = useState(false);
@@ -60,24 +62,26 @@ export function Editor({ form }: { form: EditorForm }) {
   const [selectedId, setSelectedId] = useState(form.submissions[0]?.id ?? "");
   const [extraSubmissions, setExtraSubmissions] = useState<EditorForm["submissions"]>([]);
   const [nextCursor, setNextCursor] = useState(form.nextCursor);
-  const [submissionSource, setSubmissionSource] = useState(form.submissions);
   const [pending, setPending] = useState(false);
   const [compiled, setCompiled] = useState<{ schemaSource: string; formSource: string } | null>(null);
+  const [previewVersionId, setPreviewVersionId] = useState("");
   const saveSeq = useRef(0);
   const writeQueue = useRef<Promise<void>>(Promise.resolve());
-
-  if (submissionSource !== form.submissions) {
-    setSubmissionSource(form.submissions);
-    setExtraSubmissions([]);
-    setNextCursor(form.nextCursor);
-  }
+  const serverSubmissions = useRef(form.submissions);
 
   const draftIssue = specIssue(spec);
   const dirty = !specsMatch(spec, savedSpec) || slug !== savedSlug;
-  if (!dirty && (saving || saveError)) {
-    setSaving(false);
-    setSaveError("");
-  }
+  const showSaving = dirty && saving;
+  const showSaveError = dirty ? saveError : "";
+
+  useEffect(() => {
+    if (serverSubmissions.current === form.submissions) {
+      return;
+    }
+    serverSubmissions.current = form.submissions;
+    setExtraSubmissions([]);
+    setNextCursor(form.nextCursor);
+  }, [form.submissions, form.nextCursor]);
 
   useEffect(() => {
     if (!dirty || draftIssue) {
@@ -121,11 +125,13 @@ export function Editor({ form }: { form: EditorForm }) {
   const selected = visibleSubmissions.find((row) => row.id === selectedId) ?? visibleSubmissions[0];
   const selectedSpec = selected ? form.versions.find((version) => version.id === selected.formVersionId)?.spec ?? null : null;
   const published = Boolean(publishedSpec);
-  const unpublished = publishedSpec !== null && (!specsMatch(spec, publishedSpec) || slug !== savedSlug);
-  const status = saving
+  const unpublished = publishedSpec !== null && (!specsMatch(spec, publishedSpec) || slug !== publishedSlug);
+  const sourceSlug = published ? publishedSlug : slug;
+  const previewVersion = form.versions.find((version) => version.id === previewVersionId) ?? null;
+  const status = showSaving
     ? "Saving…"
     : dirty
-      ? draftIssue || saveError || "Unsaved changes"
+      ? draftIssue || showSaveError || "Unsaved changes"
       : unpublished
         ? "Unpublished changes"
         : published && publishedAt
@@ -148,6 +154,7 @@ export function Editor({ form }: { form: EditorForm }) {
       saveSeq.current += 1;
       setSavedSpec(nextSpec);
       setSavedSlug(nextSlug);
+      setPublishedSlug(nextSlug);
       setPublishedSpec(nextSpec);
       setPublishedAt(new Date().toISOString());
       setSaving(false);
@@ -173,7 +180,7 @@ export function Editor({ form }: { form: EditorForm }) {
 
   async function handleCopyLink() {
     try {
-      await navigator.clipboard.writeText(liveHref(savedSlug));
+      await navigator.clipboard.writeText(liveHref(publishedSlug));
       toast.success("Link copied");
     } catch {
       toast.error("Could not copy the link.");
@@ -218,8 +225,20 @@ export function Editor({ form }: { form: EditorForm }) {
             {published ? <span className="mr-2 inline-block size-2 rounded-full bg-primary align-middle" aria-hidden="true" /> : null}
             {published ? "Published" : "Draft"}
           </p>
+          {published ? (
+            <p className="font-mono text-sm">
+              <span className="text-muted-foreground">Published: </span>
+              {hostedHost(publishedSlug)}
+            </p>
+          ) : null}
+          {published && slug !== publishedSlug ? (
+            <p className="font-mono text-sm">
+              <span className="text-muted-foreground">Draft address: </span>
+              {hostedHost(slug)}
+            </p>
+          ) : null}
+          {!published ? <p className="font-mono text-sm">{hostedHost(slug)}</p> : null}
           <p className="text-sm text-muted-foreground">{status}</p>
-          {published ? <p className="font-mono text-sm">{hostedHost(savedSlug)}</p> : null}
         </div>
         <div className="flex flex-wrap gap-2">
           {published ? (
@@ -228,7 +247,7 @@ export function Editor({ form }: { form: EditorForm }) {
             </Button>
           ) : null}
           {published ? (
-            <a href={liveHref(savedSlug)} target="_blank" rel="noreferrer">
+            <a href={liveHref(publishedSlug)} target="_blank" rel="noreferrer">
               <Button type="button" variant="outline">Open live</Button>
             </a>
           ) : null}
@@ -254,11 +273,17 @@ export function Editor({ form }: { form: EditorForm }) {
             <Button type="submit" variant="outline">Save email</Button>
           </form>
           <p className="text-sm text-muted-foreground">New submissions are emailed here. The inbox keeps a copy either way.</p>
-          <Input aria-label="Search submissions" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search responses" />
+          <Input aria-label="Search submissions" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={nextCursor ? "Search loaded responses" : "Search responses"} />
           <div className="grid gap-4 lg:grid-cols-2">
             <div>
               {visibleSubmissions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{submissions.length === 0 ? "No submissions yet." : "No matching responses."}</p>
+                <p className="text-sm text-muted-foreground">
+                  {submissions.length === 0
+                    ? "No submissions yet."
+                    : query.trim() && nextCursor
+                      ? "No matches in loaded responses. Load more to search older responses."
+                      : "No matching responses."}
+                </p>
               ) : (
               <ul className="divide-y rounded-lg border">
                 {visibleSubmissions.map((row) => {
@@ -318,7 +343,7 @@ export function Editor({ form }: { form: EditorForm }) {
                         const url = URL.createObjectURL(blob);
                         const link = document.createElement("a");
                         link.href = url;
-                        link.download = `${slug}.csv`;
+                        link.download = `${sourceSlug}.csv`;
                         link.click();
                         URL.revokeObjectURL(url);
                       }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not export submissions."));
@@ -331,29 +356,69 @@ export function Editor({ form }: { form: EditorForm }) {
               </div>
             ) : null}
           </div>
-          <div className="flex flex-wrap gap-2">
-            {form.versions.map((version) => (
-              <Button key={version.id} type="button" variant="outline" onClick={() => void restoreVersion(form.id, version.id).then((next) => { setSpec(next); toast.success(`Restored version ${version.versionNumber}`); })}>
-                Restore v{version.versionNumber}
-              </Button>
-            ))}
-          </div>
+          {form.versions.length > 0 ? (
+            <div className="space-y-3">
+              <h2 className="text-sm font-medium">Version history</h2>
+              <ul className="divide-y rounded-lg border">
+                {form.versions.map((version) => {
+                  const current = version.id === form.publishedVersionId;
+                  return (
+                    <li key={version.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2">
+                      <div>
+                        <p className="text-sm">v{version.versionNumber} · {formatResponseTime(version.createdAt)}</p>
+                        {current ? <p className="text-xs text-muted-foreground">Current published</p> : null}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button type="button" variant="outline" disabled={!version.spec} onClick={() => setPreviewVersionId(version.id)}>
+                          Preview
+                        </Button>
+                        {current ? null : (
+                          <Button type="button" variant="outline" onClick={() => void restoreVersion(form.id, version.id).then((next) => { setSpec(next); setPreviewVersionId(""); toast.success(`Restored version ${version.versionNumber}`); })}>
+                            Restore
+                          </Button>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+              {previewVersion?.spec ? (
+                <div className="rounded-xl border p-6">
+                  <p className="mb-4 text-sm text-muted-foreground">Preview of v{previewVersion.versionNumber}</p>
+                  <FormView spec={previewVersion.spec} preview />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </TabsContent>
-        <TabsContent value="code" className="space-y-3">
-          <p className="font-mono text-sm">npx shadcn@latest add {typeof window === "undefined" ? "" : window.location.origin}/r/{form.registryKey}.json</p>
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" onClick={() => void compileAction(spec, slug).then((result) => { setCompiled(result); void navigator.clipboard.writeText(result.formSource); })}>Copy component</Button>
-            <Button type="button" variant="outline" onClick={() => void compileAction(spec, slug).then((result) => { setCompiled(result); void navigator.clipboard.writeText(result.schemaSource); })}>Copy schema</Button>
-            <Button type="button" variant="outline" onClick={() => void compileAction(spec, slug).then((result) => {
-              setCompiled(result);
-              const blob = new Blob([`// schema.ts\n${result.schemaSource}\n\n// form.tsx\n${result.formSource}`], { type: "text/plain" });
-              const url = URL.createObjectURL(blob);
-              const link = document.createElement("a");
-              link.href = url;
-              link.download = `${slug}.txt`;
-              link.click();
-              URL.revokeObjectURL(url);
-            })}>Download</Button>
+        <TabsContent value="code" className="space-y-4">
+          <div className="space-y-2">
+            <h2 className="text-sm font-medium">Install published form</h2>
+            {published ? (
+              <>
+                <p className="font-mono text-sm">npx shadcn@latest add {typeof window === "undefined" ? "" : window.location.origin}/r/{form.registryKey}.json</p>
+                {unpublished ? <p className="text-sm text-muted-foreground">The registry contains your last published version. Publish changes to update it.</p> : null}
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">Publish this form to get a shadcn registry install command.</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-sm font-medium">Current draft source</h2>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={() => void compileAction(spec, sourceSlug).then((result) => { setCompiled(result); void navigator.clipboard.writeText(result.formSource); })}>Copy component</Button>
+              <Button type="button" variant="outline" onClick={() => void compileAction(spec, sourceSlug).then((result) => { setCompiled(result); void navigator.clipboard.writeText(result.schemaSource); })}>Copy schema</Button>
+              <Button type="button" variant="outline" onClick={() => void compileAction(spec, sourceSlug).then((result) => {
+                setCompiled(result);
+                const blob = new Blob([`// schema.ts\n${result.schemaSource}\n\n// form.tsx\n${result.formSource}`], { type: "text/plain" });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = `${sourceSlug}.txt`;
+                link.click();
+                URL.revokeObjectURL(url);
+              })}>Download</Button>
+            </div>
           </div>
           <pre className="max-h-96 overflow-auto rounded-lg border p-3 text-xs">{compiled?.formSource ?? "Copy or download to generate the source."}</pre>
         </TabsContent>

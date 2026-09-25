@@ -11,6 +11,7 @@ export const forms = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     slug: text("slug").notNull(),
+    draftSlug: text("draft_slug").notNull(),
     notifyEmail: text("notify_email"),
     registryKey: text("registry_key").notNull(),
     draftSpec: jsonb("draft_spec").notNull(),

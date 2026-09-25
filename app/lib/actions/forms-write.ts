@@ -7,6 +7,7 @@ import { formVersions, forms } from "@/db/schema";
 import { formSpecSchema, type FormSpec } from "@/app/lib/definitions";
 import { requireFormOwner, requireUser } from "@/app/lib/auth-guards";
 import { assertPublicSlug, reservedSlugs } from "@/app/lib/reserved-slugs";
+import { addressAfterDraftSave, addressAfterPublish } from "@/app/lib/slug-address";
 
 function slugify(title: string) {
   const base = title
@@ -36,10 +37,12 @@ export async function saveForm(input: unknown) {
   const user = await requireUser();
   const spec = formSpecSchema.parse(input);
   const id = randomUUID();
+  const slug = await uniqueSlug(spec.title);
   await db.insert(forms).values({
     id,
     userId: user.id,
-    slug: await uniqueSlug(spec.title),
+    slug,
+    draftSlug: slug,
     registryKey: randomBytes(24).toString("hex"),
     draftSpec: spec,
   });
@@ -48,17 +51,11 @@ export async function saveForm(input: unknown) {
 
 export async function updateDraft(formId: string, input: unknown, slug: string) {
   const user = await requireUser();
-  await requireFormOwner(formId, user.id);
+  const current = await requireFormOwner(formId, user.id);
   const spec = formSpecSchema.parse(input);
-  const nextSlug = assertPublicSlug(slug);
-  const taken = await db
-    .select({ id: forms.id })
-    .from(forms)
-    .where(and(eq(forms.slug, nextSlug), ne(forms.id, formId)));
-  if (taken[0]) {
-    throw new Error("That address is already taken.");
-  }
-  await db.update(forms).set({ draftSpec: spec, slug: nextSlug, updatedAt: new Date() }).where(eq(forms.id, formId));
+  const nextDraftSlug = assertPublicSlug(slug);
+  const address = addressAfterDraftSave(current, nextDraftSlug);
+  await db.update(forms).set({ draftSpec: spec, draftSlug: address.draftSlug, updatedAt: new Date() }).where(eq(forms.id, formId));
 }
 
 export async function publishForm(formId: string, input: unknown, slug: string) {
@@ -77,13 +74,14 @@ export async function publishForm(formId: string, input: unknown, slug: string) 
     if (taken[0]) {
       throw new Error("That address is already taken.");
     }
+    const address = addressAfterPublish(nextSlug);
     const versions = await tx
       .select({ versionNumber: formVersions.versionNumber })
       .from(formVersions)
       .where(eq(formVersions.formId, formId))
       .orderBy(desc(formVersions.versionNumber));
     const versionNumber = (versions[0]?.versionNumber ?? 0) + 1;
-    await tx.update(forms).set({ draftSpec: spec, slug: nextSlug, updatedAt: new Date() }).where(eq(forms.id, formId));
+    await tx.update(forms).set({ draftSpec: spec, slug: address.slug, draftSlug: address.draftSlug, updatedAt: new Date() }).where(eq(forms.id, formId));
     await tx.insert(formVersions).values({
       id: versionId,
       formId,
@@ -123,10 +121,12 @@ export async function duplicateForm(formId: string) {
   const spec = formSpecSchema.parse(form.draftSpec);
   const title = `${spec.title} copy`.slice(0, 200);
   const id = randomUUID();
+  const slug = await uniqueSlug(title);
   await db.insert(forms).values({
     id,
     userId: user.id,
-    slug: await uniqueSlug(title),
+    slug,
+    draftSlug: slug,
     registryKey: randomBytes(24).toString("hex"),
     draftSpec: { ...spec, title },
   });

@@ -19,16 +19,20 @@ import {
   addOption,
   addStep,
   changeFieldType,
+  defaultConditionEquals,
   deleteField,
   deleteStep,
+  earlierFields,
   fieldTypeLabels,
   moveField,
   moveStep,
   removeOption,
   renameStep,
+  setVisibleWhen,
   updateField,
   updateOptionLabel,
 } from "@/app/lib/edit-spec";
+import type { FormField } from "@/app/lib/definitions";
 
 interface EditorInspectorProps {
   spec: FormSpec;
@@ -37,6 +41,64 @@ interface EditorInspectorProps {
   onSpec: (spec: FormSpec) => void;
   onSlug: (slug: string) => void;
   onSelect: (fieldId: string) => void;
+}
+
+function canonicalNumberEquals(raw: string) {
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed === "-" || trimmed.endsWith(".")) {
+    return trimmed;
+  }
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed)) {
+    return trimmed;
+  }
+  return JSON.stringify(parsed);
+}
+
+function ConditionValue({ parent, equals, onEquals }: { parent: FormField; equals: string; onEquals: (value: string) => void }) {
+  if (parent.type === "select" || parent.type === "radio") {
+    return (
+      <Select value={equals} onValueChange={(value) => { if (value) onEquals(value); }}>
+        <SelectTrigger id="condition-value" className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {parent.options?.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  }
+
+  if (parent.type === "checkbox") {
+    return (
+      <Select value={equals} onValueChange={(value) => { if (value) onEquals(value); }}>
+        <SelectTrigger id="condition-value" className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="true">true</SelectItem>
+          <SelectItem value="false">false</SelectItem>
+        </SelectContent>
+      </Select>
+    );
+  }
+
+  if (parent.type === "number") {
+    return (
+      <Input
+        id="condition-value"
+        type="number"
+        value={equals}
+        onChange={(event) => onEquals(canonicalNumberEquals(event.target.value))}
+      />
+    );
+  }
+
+  return <Input id="condition-value" value={equals} onChange={(event) => onEquals(event.target.value)} />;
 }
 
 function apply(result: { spec: FormSpec } | { error: string }, onSpec: (spec: FormSpec) => void) {
@@ -107,6 +169,87 @@ export function FieldsInspector({ spec, selectedId, onSpec, onSelect }: EditorIn
           <Checkbox checked={selected.required} onCheckedChange={(checked) => onSpec(updateField(spec, selected.id, { required: checked === true }))} />
           Required
         </label>
+        <div className="grid gap-3 rounded-lg border p-3">
+          <p className="text-sm font-medium">Conditional visibility</p>
+          {earlierFields(spec, selected.id).length === 0 ? (
+            <p className="text-sm text-muted-foreground">Add a field above this one to show it conditionally.</p>
+          ) : (
+            <>
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={Boolean(selected.visibleWhen)}
+                  onCheckedChange={(checked) => {
+                    if (checked !== true) {
+                      onSpec(setVisibleWhen(spec, selected.id, undefined));
+                      return;
+                    }
+                    const parent = earlierFields(spec, selected.id)[0];
+                    if (!parent) {
+                      return;
+                    }
+                    onSpec(setVisibleWhen(spec, selected.id, { fieldId: parent.id, equals: defaultConditionEquals(parent) }));
+                  }}
+                />
+                Only show this field when...
+              </label>
+              {selected.visibleWhen ? (
+                <>
+                  <div className="grid gap-2">
+                    <Label htmlFor="condition-field">Field</Label>
+                    <Select
+                      value={selected.visibleWhen.fieldId}
+                      onValueChange={(value) => {
+                        const parent = earlierFields(spec, selected.id).find((field) => field.id === value);
+                        if (!parent) {
+                          return;
+                        }
+                        onSpec(setVisibleWhen(spec, selected.id, { fieldId: parent.id, equals: defaultConditionEquals(parent) }));
+                      }}
+                    >
+                      <SelectTrigger id="condition-field" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {earlierFields(spec, selected.id).map((field) => (
+                          <SelectItem key={field.id} value={field.id}>
+                            {field.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="condition-operator">Condition</Label>
+                    <Select value="equals" disabled>
+                      <SelectTrigger id="condition-operator" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="equals">equals</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="condition-value">Value</Label>
+                    {(() => {
+                      const parent = earlierFields(spec, selected.id).find((field) => field.id === selected.visibleWhen?.fieldId);
+                      if (!parent || !selected.visibleWhen) {
+                        return null;
+                      }
+                      return (
+                        <ConditionValue
+                          parent={parent}
+                          equals={selected.visibleWhen.equals}
+                          onEquals={(equals) => onSpec(setVisibleWhen(spec, selected.id, { fieldId: parent.id, equals }))}
+                        />
+                      );
+                    })()}
+                  </div>
+                </>
+              ) : null}
+            </>
+          )}
+        </div>
         {choice ? (
           <div className="grid gap-2">
             <Label>Options</Label>
@@ -221,9 +364,9 @@ export function FormSettings({ spec, slug, onSpec, onSlug }: EditorInspectorProp
         <Textarea id="success-message" value={spec.successMessage} onChange={(event) => onSpec({ ...spec, successMessage: event.target.value })} />
       </div>
       <div className="grid gap-2">
-        <Label htmlFor="slug">Address</Label>
+        <Label htmlFor="slug">Draft address</Label>
         <Input id="slug" value={slug} onChange={(event) => onSlug(event.target.value)} />
-        <p className="text-xs text-muted-foreground">The public address updates when this draft saves.</p>
+        <p className="text-xs text-muted-foreground">This address goes live when you publish.</p>
       </div>
       <div className="space-y-2">
         {spec.steps.map((step, index) => (

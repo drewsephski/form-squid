@@ -1,6 +1,6 @@
 import { describe, expect, test } from "@jest/globals";
 import { formSpecSchema, type FormSpec } from "../definitions";
-import { addField, addOption, addStep, changeFieldType, deleteField, deleteStep, removeOption, specIssue } from "../edit-spec";
+import { addField, addOption, addStep, changeFieldType, deleteField, deleteStep, moveField, removeOption, setVisibleWhen, specIssue } from "../edit-spec";
 
 const contact: FormSpec = {
   schemaVersion: 1,
@@ -95,5 +95,14 @@ describe("edit-spec", () => {
 
   test("refuses to delete the only step", () => {
     expect(deleteStep(contact, "main")).toEqual({ error: "A form needs at least one step." });
+  });
+
+  test("keeps a condition only while the parent stays earlier", () => {
+    const conditioned = setVisibleWhen(contact, "email", { fieldId: "name", equals: "Ada" });
+    expect(specIssue(conditioned)).toBeNull();
+    const moved = moveField(conditioned, "email", -1);
+    const field = moved.steps[0]?.fields.find((item) => item.id === "email");
+    expect(field?.visibleWhen).toBeUndefined();
+    expect(specIssue(moved)).toBeNull();
   });
 });

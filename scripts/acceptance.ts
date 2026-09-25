@@ -268,6 +268,12 @@ async function main() {
   if (!formsTable) {
     await run("psql", [direct, "-v", "ON_ERROR_STOP=1", "-f", path.join(root, "db/migrations/0000_silly_dreadnoughts.sql")]);
   }
+  const draftSlug = (
+    await run("psql", [direct, "-t", "-A", "-c", "select column_name from information_schema.columns where table_name = 'forms' and column_name = 'draft_slug'"])
+  ).trim();
+  if (!draftSlug) {
+    await run("psql", [direct, "-v", "ON_ERROR_STOP=1", "-f", path.join(root, "db/migrations/0002_draft_slug.sql")]);
+  }
 
   const functionOrigin = await deployFunction();
   const formsquidPort = await freePort();
