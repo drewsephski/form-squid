@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { AITextLoading } from "@/components/ui/ai-text-loading";
 import { AnimateHeight } from "@/components/ui/animate-height";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,7 +22,7 @@ function prefersReducedMotion() {
 
 function GeneratingMark() {
   return (
-    <div className="flex aspect-video w-full items-center justify-center" aria-hidden="true">
+    <div className="flex aspect-video w-full flex-col items-center justify-center gap-4" aria-hidden="true">
       <div className="loader generate-loader">
         <div className="box">
           <div className="logo">
@@ -33,6 +34,10 @@ function GeneratingMark() {
         <div className="box" />
         <div className="box" />
       </div>
+      <AITextLoading
+        texts={["Thinking...", "Drafting fields...", "Shaping layout...", "Almost ready..."]}
+        interval={1600}
+      />
     </div>
   );
 }
