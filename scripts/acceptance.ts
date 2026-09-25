@@ -326,6 +326,18 @@ async function main() {
   if (!formWebhooks) {
     await run("psql", [direct, "-v", "ON_ERROR_STOP=1", "-f", path.join(root, "db/migrations/0003_fantastic_edwin_jarvis.sql")]);
   }
+  const submissionFiles = (
+    await run("psql", [direct, "-t", "-A", "-c", "select to_regclass('public.submission_files')"])
+  ).trim();
+  if (!submissionFiles) {
+    await run("psql", [
+      direct,
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-f",
+      path.join(root, "db/migrations/0004_nice_master_mold.sql"),
+    ]);
+  }
 
   const functionOrigin = await deployFunction();
   const formsquidPort = await freePort();

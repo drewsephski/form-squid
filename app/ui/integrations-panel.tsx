@@ -30,7 +30,7 @@ export type WebhookPanelState = {
   id: string;
   url: string;
   enabled: boolean;
-  secret: string;
+  hasSecret: true;
   secretMasked: string;
   createdAt: string;
   updatedAt: string;
@@ -70,23 +70,25 @@ export function IntegrationsPanel({ formId, initialWebhook }: IntegrationsPanelP
   const [webhook, setWebhook] = useState<WebhookPanelState | null>(initialWebhook);
   const [url, setUrl] = useState(initialWebhook?.url ?? "");
   const [enabled, setEnabled] = useState(initialWebhook?.enabled ?? true);
-  const [secret, setSecret] = useState(initialWebhook?.secret ?? "");
+  /** One-time plaintext secret from create/rotate only — never loaded from normal reads. */
+  const [revealedSecret, setRevealedSecret] = useState<string | null>(null);
   const [secretMasked, setSecretMasked] = useState(initialWebhook?.secretMasked ?? "fs_whsec_********");
   const [pending, setPending] = useState(false);
   const [testResult, setTestResult] = useState("");
   const [rotateOpen, setRotateOpen] = useState(false);
 
-  async function refresh() {
+  async function refresh(preserveRevealedSecret = false) {
     const next = await getWebhook(formId);
     setWebhook(next);
     if (next) {
       setUrl(next.url);
       setEnabled(next.enabled);
-      setSecret(next.secret);
       setSecretMasked(next.secretMasked);
     } else {
-      setSecret("");
       setSecretMasked("fs_whsec_********");
+    }
+    if (!preserveRevealedSecret) {
+      setRevealedSecret(null);
     }
   }
 
@@ -94,13 +96,15 @@ export function IntegrationsPanel({ formId, initialWebhook }: IntegrationsPanelP
     setPending(true);
     try {
       const result = await saveWebhook(formId, url, enabled);
-      setSecret(result.secret);
+      if (result.secret) {
+        setRevealedSecret(result.secret);
+      }
       setSecretMasked(result.secretMasked);
       if (result.created) {
         trackFunnel("webhook_connected", { page: "/forms", authenticated: true });
       }
       toast.success(result.created ? "Webhook saved." : "Webhook updated.");
-      await refresh();
+      await refresh(Boolean(result.secret));
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Could not save webhook.");
     } finally {
@@ -109,12 +113,12 @@ export function IntegrationsPanel({ formId, initialWebhook }: IntegrationsPanelP
   }
 
   async function handleCopySecret() {
-    if (!secret) {
-      toast.error("Save a webhook to get a signing secret.");
+    if (!revealedSecret) {
+      toast.error("Signing secrets are shown once. Rotate the secret if you need a new one.");
       return;
     }
     try {
-      await navigator.clipboard.writeText(secret);
+      await navigator.clipboard.writeText(revealedSecret);
       toast.success("Signing secret copied");
     } catch {
       toast.error("Could not copy the secret.");
@@ -125,11 +129,11 @@ export function IntegrationsPanel({ formId, initialWebhook }: IntegrationsPanelP
     setPending(true);
     try {
       const result = await rotateWebhookSecret(formId);
-      setSecret(result.secret);
+      setRevealedSecret(result.secret);
       setSecretMasked(result.secretMasked);
       setRotateOpen(false);
       toast.success("Signing secret rotated.");
-      await refresh();
+      await refresh(true);
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Could not rotate secret.");
     } finally {
@@ -150,7 +154,7 @@ export function IntegrationsPanel({ formId, initialWebhook }: IntegrationsPanelP
         setTestResult(result.error ?? `Failed · HTTP ${result.responseStatus ?? "—"}`);
         toast.error(result.error ?? "Test webhook failed.");
       }
-      await refresh();
+      await refresh(Boolean(revealedSecret));
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Could not send test.";
       setTestResult(message);
@@ -169,7 +173,7 @@ export function IntegrationsPanel({ formId, initialWebhook }: IntegrationsPanelP
       } else {
         toast.error(result.error ?? "Retry failed.");
       }
-      await refresh();
+      await refresh(Boolean(revealedSecret));
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Could not retry delivery.");
     } finally {
@@ -215,13 +219,25 @@ export function IntegrationsPanel({ formId, initialWebhook }: IntegrationsPanelP
         </Button>
       </div>
 
-      {webhook || secret ? (
+      {webhook || revealedSecret ? (
         <div className="space-y-3">
           <div className="space-y-2">
             <p className="text-sm font-medium">Signing secret</p>
+            <p className="text-sm text-muted-foreground">
+              Signing secrets are shown once. Rotate the secret if you need a new one.
+            </p>
             <div className="flex flex-wrap items-center gap-2">
-              <code className="rounded-md border bg-muted/40 px-2 py-1 font-mono text-xs">{secretMasked}</code>
-              <Button type="button" variant="outline" size="sm" onClick={() => void handleCopySecret()} disabled={!secret}>
+              <code className="rounded-md border bg-muted/40 px-2 py-1 font-mono text-xs">
+                {revealedSecret ?? secretMasked}
+              </code>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void handleCopySecret()}
+                disabled={!revealedSecret}
+                aria-label="Copy signing secret"
+              >
                 Copy
               </Button>
               <Button
@@ -287,7 +303,8 @@ export function IntegrationsPanel({ formId, initialWebhook }: IntegrationsPanelP
           <AlertDialogHeader>
             <AlertDialogTitle>Rotate signing secret?</AlertDialogTitle>
             <AlertDialogDescription>
-              The current secret stops working immediately. Update your endpoint before rotating if you rely on verification.
+              The current secret stops working immediately. Update your endpoint before rotating if you rely on
+              verification. Signing secrets are shown once.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

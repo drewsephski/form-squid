@@ -18,7 +18,10 @@ export const abuseCeilings = {
 
 export const submissionUploadsBucket = "submission-uploads";
 
-/** Default MIME allowlist when a file field omits `accept`. */
+/**
+ * Default MIME allowlist when a file field omits `accept`.
+ * Office formats are omitted until V1 can verify them by content (not Content-Type alone).
+ */
 export const defaultAcceptMimeTypes = [
   "application/pdf",
   "image/png",
@@ -27,10 +30,6 @@ export const defaultAcceptMimeTypes = [
   "image/webp",
   "text/plain",
   "text/csv",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ] as const;
 
 export function effectiveMaxFileSizeMb(configuredMb?: number) {

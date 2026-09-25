@@ -45,7 +45,7 @@ interface EditorForm {
     id: string;
     url: string;
     enabled: boolean;
-    secret: string;
+    hasSecret: true;
     secretMasked: string;
     createdAt: string;
     updatedAt: string;

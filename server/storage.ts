@@ -1,7 +1,12 @@
-import { DeleteObjectCommand, HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { abuseCeilings, submissionUploadsBucket } from "../app/lib/upload-limits";
 import { contentDispositionAttachment } from "../app/lib/file-field";
 
@@ -19,6 +24,11 @@ function s3Client() {
 export function opaqueStorageKey(formId: string, uploadId: string) {
   return `forms/${formId}/uploads/${uploadId}`;
 }
+
+export type StoredObjectMeta = {
+  size: number;
+  contentType: string | null;
+};
 
 export async function createSignedUpload(input: {
   storageKey: string;
@@ -66,21 +76,51 @@ export async function deleteStoredObject(storageKey: string) {
   );
 }
 
-export async function storedObjectExists(storageKey: string) {
+export async function headStoredObject(storageKey: string): Promise<StoredObjectMeta | null> {
   try {
-    await s3Client().send(
+    const result = await s3Client().send(
       new HeadObjectCommand({
         Bucket: submissionUploadsBucket,
         Key: storageKey,
       }),
     );
-    return true;
+    const size = result.ContentLength;
+    if (typeof size !== "number" || !Number.isFinite(size)) {
+      return null;
+    }
+    return {
+      size,
+      contentType: result.ContentType?.split(";")[0]?.trim().toLowerCase() || null,
+    };
   } catch {
-    return false;
+    return null;
   }
 }
 
-// Keep PutObject available for server-side maintenance/tests if needed.
+export async function storedObjectExists(storageKey: string) {
+  return (await headStoredObject(storageKey)) !== null;
+}
+
+/** Read the leading bytes of an object for content sniffing. */
+export async function readStoredObjectPrefix(storageKey: string, maxBytes = 512): Promise<Uint8Array | null> {
+  try {
+    const result = await s3Client().send(
+      new GetObjectCommand({
+        Bucket: submissionUploadsBucket,
+        Key: storageKey,
+        Range: `bytes=0-${Math.max(0, maxBytes - 1)}`,
+      }),
+    );
+    if (!result.Body) {
+      return null;
+    }
+    const bytes = await result.Body.transformToByteArray();
+    return bytes;
+  } catch {
+    return null;
+  }
+}
+
 export async function putStoredObject(input: { storageKey: string; body: Uint8Array; contentType: string }) {
   await s3Client().send(
     new PutObjectCommand({

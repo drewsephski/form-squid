@@ -17,7 +17,7 @@ import { formVersions, forms, submissions } from "../db/schema";
 import { senderAddress, submissionNotificationEmail } from "./mail";
 import { reserveSubmissionAttempt } from "./rate-limit";
 import type { SubmissionEvent } from "./submission-log";
-import { attachUploadsToSubmission } from "./uploads";
+import { claimUploadsForSubmission, prepareUploadsForSubmission } from "./uploads";
 import type { SubmissionDispatch } from "./webhooks/payload";
 
 export type SubmitDatabase = NodePgDatabase<typeof schema>;
@@ -139,26 +139,33 @@ export async function submitForm(
   try {
     if (needsUploadAttach) {
       storedData = await database.transaction(async (tx) => {
-        const attached = await attachUploadsToSubmission(tx, {
+        const prepared = await prepareUploadsForSubmission(tx, {
           formId: form.id,
-          submissionId,
           actorHash: input.actorHash,
           spec,
           data: result.data,
         });
-        if (!attached.ok) {
-          throw Object.assign(new Error("upload_attach_failed"), { errors: attached.errors });
+        if (!prepared.ok) {
+          throw Object.assign(new Error("upload_attach_failed"), { errors: prepared.errors });
         }
 
+        // INSERT submissions before claiming submission_files (FK on submission_id).
         await tx.insert(submissions).values({
           id: submissionId,
           formId: form.id,
           formVersionId: version.id,
-          payload: attached.data,
+          payload: prepared.data,
           createdAt: now,
         });
 
-        return attached.data;
+        await claimUploadsForSubmission(tx, {
+          formId: form.id,
+          submissionId,
+          actorHash: input.actorHash,
+          claims: prepared.claims,
+        });
+
+        return prepared.data;
       });
     } else {
       await database.insert(submissions).values({

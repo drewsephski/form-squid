@@ -41,7 +41,7 @@ export async function getWebhook(formId: string) {
     id: webhook.id,
     url: webhook.url,
     enabled: webhook.enabled,
-    secret: webhook.secret,
+    hasSecret: true as const,
     secretMasked: maskWebhookSecret(webhook.secret),
     createdAt: webhook.createdAt.toISOString(),
     updatedAt: webhook.updatedAt.toISOString(),
@@ -74,7 +74,8 @@ export async function saveWebhook(formId: string, url: string, enabled: boolean)
       .where(eq(formWebhooks.id, existing.id));
     return {
       created: false,
-      secret: existing.secret,
+      secret: null as string | null,
+      hasSecret: true as const,
       secretMasked: maskWebhookSecret(existing.secret),
     };
   }
@@ -92,6 +93,7 @@ export async function saveWebhook(formId: string, url: string, enabled: boolean)
   return {
     created: true,
     secret,
+    hasSecret: true as const,
     secretMasked: maskWebhookSecret(secret),
   };
 }
@@ -111,6 +113,7 @@ export async function rotateWebhookSecret(formId: string) {
     .where(eq(formWebhooks.id, existing.id));
   return {
     secret,
+    hasSecret: true as const,
     secretMasked: maskWebhookSecret(secret),
   };
 }

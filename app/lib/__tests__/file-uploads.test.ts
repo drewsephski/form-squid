@@ -1,4 +1,5 @@
 import { describe, expect, test } from "@jest/globals";
+import { compileForm } from "../compiler";
 import { formSpecSchema } from "../definitions";
 import { mimeAllowed, sanitizeDisplayFilename } from "../file-field";
 import { labeledAnswers, csvFileCell } from "../submission-display";
@@ -152,5 +153,36 @@ describe("file display and webhooks", () => {
   test("sanitizes display filenames", () => {
     expect(sanitizeDisplayFilename("../../etc/passwd")).toBe("passwd");
     expect(sanitizeDisplayFilename('bad<>:"|?.pdf')).toBe("bad______.pdf");
+  });
+});
+
+describe("default file accept policy", () => {
+  test("does not include unverified Office formats in the default allowlist", async () => {
+    const { defaultAcceptMimeTypes } = await import("../upload-limits");
+    expect(defaultAcceptMimeTypes).not.toContain("application/msword");
+    expect(defaultAcceptMimeTypes).not.toContain(
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    );
+    expect(defaultAcceptMimeTypes).toContain("application/pdf");
+  });
+});
+
+describe("exported file field sources", () => {
+  test("callback source keeps browser File objects and does not call the upload API", () => {
+    const compiled = compileForm(resume, { submission: "callback" });
+    expect(compiled.formSource).toContain("browser File objects");
+    expect(compiled.formSource).not.toContain("/uploads");
+    expect(compiled.formSource).not.toContain("uploadId");
+  });
+
+  test("hosted registry source uses the upload API and opaque upload ids", () => {
+    const compiled = compileForm(resume, {
+      submission: "formsquid",
+      url: "https://api.formsquid.com/forms/apply/submissions",
+      uploadUrl: "https://api.formsquid.com/forms/apply/uploads",
+    });
+    expect(compiled.formSource).toContain("https://api.formsquid.com/forms/apply/uploads");
+    expect(compiled.formSource).toContain("uploadId");
+    expect(compiled.formSource).toContain("serializeSubmission");
   });
 });

@@ -139,7 +139,7 @@ export async function getForm(formId: string) {
           id: webhook.id,
           url: webhook.url,
           enabled: webhook.enabled,
-          secret: webhook.secret,
+          hasSecret: true as const,
           secretMasked: maskWebhookSecret(webhook.secret),
           createdAt: webhook.createdAt.toISOString(),
           updatedAt: webhook.updatedAt.toISOString(),
