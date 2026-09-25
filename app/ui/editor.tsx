@@ -298,13 +298,23 @@ export function Editor({ form }: { form: EditorForm }) {
             className="flex gap-2"
             onSubmit={(event) => {
               event.preventDefault();
-              void updateNotifyEmail(form.id, notifyEmail).then(() => toast.success("Notification email saved")).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not save email"));
+              void updateNotifyEmail(form.id, notifyEmail)
+                .then(() =>
+                  toast.success(
+                    notifyEmail.trim()
+                      ? "Notification email saved. First messages often land in spam — mark FormSquid as not spam."
+                      : "Notification email cleared.",
+                  ),
+                )
+                .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not save email"));
             }}
           >
             <Input aria-label="Notification email" type="email" value={notifyEmail} onChange={(event) => setNotifyEmail(event.target.value)} placeholder="Notifications are off until you add an email" />
             <Button type="submit" variant="outline">Save email</Button>
           </form>
-          <p className="text-sm text-muted-foreground">New submissions are emailed here. The inbox keeps a copy either way.</p>
+          <p className="text-sm text-muted-foreground">
+            New submissions are emailed here. The inbox keeps a copy either way. First emails often land in spam — open one and choose &quot;Report not spam&quot; so later ones reach your inbox.
+          </p>
           <Input aria-label="Search submissions" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={nextCursor ? "Search loaded responses" : "Search responses"} />
           <div className="grid gap-4 lg:grid-cols-[minmax(14rem,20rem)_minmax(0,1fr)]">
             <div>

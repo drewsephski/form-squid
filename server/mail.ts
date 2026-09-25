@@ -58,3 +58,36 @@ export function passwordResetEmail(url: string) {
     html,
   };
 }
+
+export function submissionNotificationEmail(input: {
+  formTitle: string;
+  answers: Array<{ label: string; value: string }>;
+  inboxUrl: string;
+}) {
+  const title = input.formTitle.trim() || "your form";
+  const subject = `New response on ${title}`;
+  const rows = input.answers.map((answer) => `${answer.label}: ${answer.value}`);
+  const text = [
+    subject,
+    "",
+    ...rows,
+    "",
+    "View this response in FormSquid:",
+    input.inboxUrl,
+  ].join("\n");
+
+  const answerHtml = input.answers
+    .map(
+      (answer) =>
+        `<tr><td style="padding:8px 12px 8px 0;color:#667085;vertical-align:top;white-space:nowrap;">${escapeHtml(answer.label)}</td><td style="padding:8px 0;color:#101828;vertical-align:top;">${escapeHtml(answer.value).replace(/\n/g, "<br>")}</td></tr>`,
+    )
+    .join("");
+
+  const html = [
+    `<p style="margin:0 0 16px;font-size:16px;color:#101828;">${escapeHtml(subject)}</p>`,
+    `<table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;max-width:560px;">${answerHtml}</table>`,
+    `<p style="margin:20px 0 0;font-size:14px;"><a href="${escapeHtml(input.inboxUrl)}">View in FormSquid</a></p>`,
+  ].join("");
+
+  return { subject, text, html };
+}

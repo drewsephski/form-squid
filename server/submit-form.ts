@@ -9,10 +9,12 @@ import {
   maxSubmissionsPerDay,
   type SubmissionError,
 } from "../app/lib/definitions";
+import { appOrigin } from "../app/lib/origin";
+import { labeledAnswers } from "../app/lib/submission-display";
 import { validateSubmission } from "../app/lib/validate-submission";
 import * as schema from "../db/schema";
 import { formVersions, forms, submissions } from "../db/schema";
-import { senderAddress } from "./mail";
+import { senderAddress, submissionNotificationEmail } from "./mail";
 import { reserveSubmissionAttempt } from "./rate-limit";
 import type { SubmissionEvent } from "./submission-log";
 
@@ -132,12 +134,18 @@ export async function submitForm(
 
   if (process.env.RESEND_API_KEY && form.notifyEmail) {
     try {
+      const message = submissionNotificationEmail({
+        formTitle: spec.title || input.slug,
+        answers: labeledAnswers(spec, result.data),
+        inboxUrl: `${appOrigin()}/forms/${form.id}`,
+      });
       const resend = new Resend(process.env.RESEND_API_KEY);
       await resend.emails.send({
         from: senderAddress("RESEND_FROM"),
         to: form.notifyEmail,
-        subject: `New submission for ${input.slug}`,
-        text: JSON.stringify(result.data, null, 2),
+        subject: message.subject,
+        text: message.text,
+        html: message.html,
       });
     } catch (error) {
       console.error("submission notification failed", error);

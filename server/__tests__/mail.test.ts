@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "@jest/globals";
-import { senderAddress } from "../mail";
+import { senderAddress, submissionNotificationEmail } from "../mail";
 
 const originalNodeEnv = process.env.NODE_ENV;
 const originalVercelEnv = process.env.VERCEL_ENV;
@@ -47,5 +47,41 @@ describe("senderAddress", () => {
     process.env.NODE_ENV = "production";
     process.env.RESEND_FROM = "FormSquid <onboarding@resend.dev>";
     expect(() => senderAddress("RESEND_FROM")).toThrow("cannot use the Resend test sender");
+  });
+});
+
+describe("submissionNotificationEmail", () => {
+  test("builds labeled text and html instead of raw json", () => {
+    const message = submissionNotificationEmail({
+      formTitle: "Client intake",
+      answers: [
+        { label: "Name", value: "Ada" },
+        { label: "Email", value: "ada@example.com" },
+        { label: "Notes", value: "Line one\nLine two" },
+      ],
+      inboxUrl: "https://formsquid.com/forms/abc",
+    });
+
+    expect(message.subject).toBe("New response on Client intake");
+    expect(message.text).toContain("Name: Ada");
+    expect(message.text).toContain("ada@example.com");
+    expect(message.text).not.toContain("{");
+    expect(message.html).toContain("Name");
+    expect(message.html).toContain("Ada");
+    expect(message.html).toContain("<br>");
+    expect(message.html).toContain('href="https://formsquid.com/forms/abc"');
+    expect(message.html).not.toContain("<script");
+  });
+
+  test("escapes html in answers", () => {
+    const message = submissionNotificationEmail({
+      formTitle: "Intake <script>",
+      answers: [{ label: "Bio", value: '<img src=x onerror="alert(1)">' }],
+      inboxUrl: "https://formsquid.com/forms/abc",
+    });
+
+    expect(message.html).toContain("Intake &lt;script&gt;");
+    expect(message.html).toContain("&lt;img src=x onerror=&quot;alert(1)&quot;&gt;");
+    expect(message.html).not.toContain("<script>");
   });
 });
