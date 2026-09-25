@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { saveForm } from "@/app/lib/actions/forms-write";
+import { trackFunnel } from "@/app/lib/analytics";
 import { pendingSpecKey } from "@/app/lib/definitions";
 import { authClient } from "@/lib/auth-client";
 
@@ -33,6 +34,9 @@ export function AuthForm({ mode }: AuthFormProps) {
       setError(result.error.message ?? "Could not sign in.");
       return;
     }
+    if (mode === "sign-up") {
+      trackFunnel("signup_completed", { page: "/sign-up", authenticated: true });
+    }
 
     const pendingSpec = window.localStorage.getItem(pendingSpecKey);
     if (!pendingSpec) {
@@ -42,6 +46,7 @@ export function AuthForm({ mode }: AuthFormProps) {
 
     try {
       const saved = await saveForm(JSON.parse(pendingSpec));
+      trackFunnel("form_created", { page: mode === "sign-up" ? "/sign-up" : "/sign-in", authenticated: true });
       window.localStorage.removeItem(pendingSpecKey);
       router.push(`/forms/${saved.id}`);
     } catch (caught) {

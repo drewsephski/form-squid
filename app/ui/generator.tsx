@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { generateAction } from "@/app/lib/actions/generate";
+import { trackFunnel } from "@/app/lib/analytics";
 import { pendingSpecKey, type FormSpec } from "@/app/lib/definitions";
 import { promptPresets } from "@/app/lib/prompt-presets";
 import { FormView } from "@/app/ui/form-view";
@@ -19,6 +20,7 @@ export function Generator() {
   async function handleGenerate() {
     setPending(true);
     setError("");
+    trackFunnel("generation_started", { page: "/" });
     const result = await generateAction(prompt);
     setPending(false);
     if (result.error || !result.spec) {
@@ -26,6 +28,7 @@ export function Generator() {
       return;
     }
     setSpec(result.spec);
+    trackFunnel("generation_succeeded", { page: "/" });
     window.localStorage.setItem(pendingSpecKey, JSON.stringify(result.spec));
   }
 

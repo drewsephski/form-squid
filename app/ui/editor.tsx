@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { generateAction } from "@/app/lib/actions/generate";
 import { exportSubmissionsCsv, loadSubmissions } from "@/app/lib/actions/forms-read";
 import { publishForm, restoreVersion, updateDraft, updateNotifyEmail } from "@/app/lib/actions/forms-write";
+import { trackFunnel } from "@/app/lib/analytics";
 import { deleteSubmission } from "@/app/lib/actions/submissions-write";
 import { compileAction } from "@/app/lib/actions/compile";
 import { describeSpecChange } from "@/app/lib/diff-spec";
@@ -153,6 +154,7 @@ export function Editor({ form }: { form: EditorForm }) {
       const nextSpec = spec;
       const nextSlug = slug;
       await publishForm(form.id, nextSpec, nextSlug);
+      trackFunnel("form_published", { page: "/forms", authenticated: true });
       saveSeq.current += 1;
       setSavedSpec(nextSpec);
       setSavedSlug(nextSlug);

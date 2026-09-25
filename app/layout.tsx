@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { siteOrigin } from "@/app/lib/seo";
+import { FunnelAnalytics } from "@/app/ui/funnel-analytics";
 import "./globals.css";
 
 const fraunces = Fraunces({
@@ -35,6 +36,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="flex min-h-dvh flex-col bg-background font-sans text-foreground">
         <div className="flex flex-1 flex-col">{children}</div>
         <Toaster />
+        <FunnelAnalytics />
       </body>
     </html>
   );

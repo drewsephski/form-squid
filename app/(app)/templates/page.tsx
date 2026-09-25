@@ -3,6 +3,7 @@ import Link from "next/link";
 import { pageMetadata } from "@/app/lib/seo";
 import { templates } from "@/app/lib/templates";
 import { FormMiniPreview } from "@/app/ui/form-mini-preview";
+import { SeoPageView } from "@/app/ui/seo-page-view";
 
 export const metadata: Metadata = pageMetadata({
   title: "Form Templates | FormSquid",
@@ -14,6 +15,7 @@ export const metadata: Metadata = pageMetadata({
 export default function TemplatesPage() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-8">
+      <SeoPageView page="/templates" />
       <div className="mb-8 space-y-2">
         <h1 className="font-heading text-4xl font-medium tracking-tight">Templates</h1>
         <p className="max-w-xl text-muted-foreground">Working forms you can preview, save, and customize.</p>

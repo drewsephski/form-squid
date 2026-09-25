@@ -3,35 +3,41 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { trackFunnel, type FunnelProperties } from "@/app/lib/analytics";
 
-interface SourceTabsProps {
+interface SourceTabsProps extends FunnelProperties {
   formSource: string;
   schemaSource: string;
 }
 
-export function SourceTabs({ formSource, schemaSource }: SourceTabsProps) {
+export function SourceTabs({ formSource, schemaSource, page, shadcnSlug }: SourceTabsProps) {
+  function handleTabChange(value: string) {
+    trackFunnel("source_tab_opened", { page: value === "schema" ? `${page}#schema` : page, shadcnSlug });
+  }
+
   return (
-    <Tabs defaultValue="component">
+    <Tabs defaultValue="component" onValueChange={handleTabChange}>
       <TabsList>
         <TabsTrigger value="component">Component</TabsTrigger>
         <TabsTrigger value="schema">Zod schema</TabsTrigger>
       </TabsList>
       <TabsContent value="component">
-        <SourceBlock source={formSource} label="Component source" />
+        <SourceBlock source={formSource} label="Component source" page={page} shadcnSlug={shadcnSlug} />
       </TabsContent>
       <TabsContent value="schema">
-        <SourceBlock source={schemaSource} label="Zod schema source" />
+        <SourceBlock source={schemaSource} label="Zod schema source" page={page} shadcnSlug={shadcnSlug} />
       </TabsContent>
     </Tabs>
   );
 }
 
-function SourceBlock({ source, label }: { source: string; label: string }) {
+function SourceBlock({ source, label, page, shadcnSlug }: { source: string; label: string } & FunnelProperties) {
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
     await navigator.clipboard.writeText(source);
     setCopied(true);
+    trackFunnel("source_copied", { page, shadcnSlug });
   }
 
   return (

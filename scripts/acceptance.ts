@@ -134,6 +134,18 @@ async function connectionString(pooled: boolean) {
   return url;
 }
 
+async function useSignedInTemplate(page: Page, origin: string, databaseUrl: string) {
+  await page.goto(`${origin}/templates/contact`);
+  await page.getByRole("button", { name: "Use this template" }).click();
+  await page.waitForURL(/\/forms\/.+/);
+  const title = (
+    await run("psql", [databaseUrl, "-t", "-A", "-c", "select draft_spec->>'title' from forms where draft_spec->>'title' = 'Contact'"])
+  ).trim();
+  if (title !== "Contact") {
+    throw new Error("Signed-in template use did not create a Contact form.");
+  }
+}
+
 async function publishForm(page: Page, origin: string) {
   await page.addInitScript(
     ([key, spec]) => {
@@ -147,7 +159,7 @@ async function publishForm(page: Page, origin: string) {
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Create account" }).click();
   await page.waitForURL(/\/forms\/.+/);
-  await page.getByRole("tab", { name: "Fields" }).click();
+  await page.getByRole("tab", { name: "Form" }).click();
   await page.locator("#slug").fill(slug);
   await page.getByRole("button", { name: "Publish" }).click();
   await page.getByText("Published", { exact: true }).waitFor();
@@ -214,22 +226,51 @@ async function assertSubmission(databaseUrl: string) {
   }
 }
 
+async function dumpFunctionDiagnostics() {
+  const commands: Array<{ label: string; args: string[] }> = [
+    {
+      label: "neon functions get api",
+      args: ["functions", "get", "api", "--branch", branchName, "--project-id", projectId, "--list-env-variables"],
+    },
+    {
+      label: "neon functions list",
+      args: ["functions", "list", "--branch", branchName, "--project-id", projectId],
+    },
+    {
+      label: "neon logs query --source function",
+      args: ["logs", "query", "--branch", branchName, "--project-id", projectId, "--source", "function", "--since", "1h", "--limit", "50"],
+    },
+  ];
+  for (const command of commands) {
+    console.error(`\n--- ${command.label} ---`);
+    try {
+      console.error(await run("neon", command.args));
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : error);
+    }
+  }
+}
+
 async function cleanup() {
   await browser?.close().catch(() => undefined);
   for (const child of children) {
     child.kill("SIGTERM");
   }
-  if (branchCreated) {
-    await run("neon", ["branches", "delete", branchName, "--project-id", projectId]).catch(
-      (error: unknown) => {
-        console.error(error instanceof Error ? error.message : error);
-      },
-    );
+  if (!branchCreated) return;
+  if (process.env.ACCEPTANCE_KEEP_BRANCH === "1") {
+    console.error(`Keeping disposable branch ${branchName} because ACCEPTANCE_KEEP_BRANCH=1`);
+    return;
   }
+  await run("neon", ["branches", "delete", branchName, "--project-id", projectId]).catch(
+    (error: unknown) => {
+      console.error(error instanceof Error ? error.message : error);
+    },
+  );
 }
 
 async function deployFunction() {
   console.log(`Deploying API function on ${branchName}`);
+  const acceptanceSalt = randomUUID() + randomUUID();
   await run("neon", [
     "functions",
     "deploy",
@@ -240,6 +281,8 @@ async function deployFunction() {
     branchName,
     "--project-id",
     projectId,
+    "--env",
+    `RATE_LIMIT_IP_SALT=${acceptanceSalt}`,
   ]);
   const details = await run("neon", [
     "functions",
@@ -254,7 +297,12 @@ async function deployFunction() {
   if (!url) {
     throw new Error(`Neon did not return a function URL.\n${details}`);
   }
-  await waitForOk(`${url}/health`);
+  try {
+    await waitForOk(`${url}/health`);
+  } catch (error) {
+    await dumpFunctionDiagnostics();
+    throw error;
+  }
   return url;
 }
 
@@ -300,6 +348,7 @@ async function main() {
   const context = await browser.newContext();
   const page = await context.newPage();
   await publishForm(page, formsquidOrigin);
+  await useSignedInTemplate(page, formsquidOrigin, direct);
 
   const registryKey = (
     await run("psql", [

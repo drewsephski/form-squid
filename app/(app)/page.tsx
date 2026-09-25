@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { Generator } from "@/app/ui/generator";
+import { SeoPageView } from "@/app/ui/seo-page-view";
 import { TemplateSection } from "@/app/ui/template-section";
 import { pageMetadata } from "@/app/lib/seo";
 
@@ -13,6 +14,7 @@ export const metadata: Metadata = pageMetadata({
 export default function Home() {
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center px-4 py-8">
+      <SeoPageView page="/" />
       <div className="my-auto space-y-8">
         <div className="space-y-4 text-center">
           <p className="text-[11px] font-medium tracking-[0.22em] text-muted-foreground uppercase">Generate it. Host it. Own the code.</p>

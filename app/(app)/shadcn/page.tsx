@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { pageMetadata } from "@/app/lib/seo";
 import { shadcnPages } from "@/app/lib/shadcn/pages";
+import { SeoPageView } from "@/app/ui/seo-page-view";
 
 export const metadata: Metadata = pageMetadata({
   title: "Shadcn Form Examples | FormSquid",
@@ -13,6 +14,7 @@ export const metadata: Metadata = pageMetadata({
 export default function ShadcnIndexPage() {
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-8">
+      <SeoPageView page="/shadcn" />
       <div className="mb-8 space-y-2">
         <h1 className="font-heading text-4xl font-medium tracking-tight">Shadcn form examples</h1>
         <p className="max-w-xl text-muted-foreground">

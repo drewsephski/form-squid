@@ -5,6 +5,7 @@ import { compileForm } from "@/app/lib/compiler";
 import { pageMetadata } from "@/app/lib/seo";
 import { getShadcnPage, shadcnPages } from "@/app/lib/shadcn/pages";
 import { FormView } from "@/app/ui/form-view";
+import { SeoPageView } from "@/app/ui/seo-page-view";
 import { SourceTabs } from "@/app/ui/source-tabs";
 import { UseTemplateButton } from "@/app/ui/use-template-button";
 
@@ -37,6 +38,7 @@ export default async function ShadcnExamplePage({ params }: { params: Promise<{ 
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-12 px-4 py-8">
+      <SeoPageView page={`/shadcn/${page.slug}`} shadcnSlug={page.slug} />
       <header className="space-y-3">
         <p className="text-xs tracking-wide text-muted-foreground uppercase">shadcn/ui</p>
         <h1 className="font-heading text-4xl font-medium tracking-tight">{page.title}</h1>
@@ -53,7 +55,7 @@ export default async function ShadcnExamplePage({ params }: { params: Promise<{ 
       <section className="space-y-3" aria-labelledby="customize">
         <h2 id="customize" className="text-sm font-medium">Customize with AI</h2>
         <p className="text-sm text-muted-foreground">Open this exact spec in FormSquid. Signed-in accounts go straight to the editor.</p>
-        <UseTemplateButton spec={page.spec} label="Customize with AI" />
+        <UseTemplateButton spec={page.spec} label="Customize with AI" intent="customize" page={`/shadcn/${page.slug}`} shadcnSlug={page.slug} />
         {page.templateHref ? (
           <p className="text-sm text-muted-foreground">
             <Link href={page.templateHref} className="underline-offset-4 hover:underline">
@@ -68,7 +70,7 @@ export default async function ShadcnExamplePage({ params }: { params: Promise<{ 
         <p className="text-sm text-muted-foreground">
           Standalone source. <code>ExportedForm</code> calls <code>onSubmit</code> with the validated data.
         </p>
-        <SourceTabs formSource={compiled.formSource} schemaSource={compiled.schemaSource} />
+        <SourceTabs formSource={compiled.formSource} schemaSource={compiled.schemaSource} page={`/shadcn/${page.slug}`} shadcnSlug={page.slug} />
       </section>
 
       <section className="space-y-3" aria-labelledby="included">

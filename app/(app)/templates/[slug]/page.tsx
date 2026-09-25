@@ -5,6 +5,7 @@ import { pageMetadata } from "@/app/lib/seo";
 import { getTemplate, templates } from "@/app/lib/templates";
 import { templateSeo } from "@/app/lib/templates/seo";
 import { FormView } from "@/app/ui/form-view";
+import { SeoPageView } from "@/app/ui/seo-page-view";
 import { UseTemplateButton } from "@/app/ui/use-template-button";
 
 export function generateStaticParams() {
@@ -36,6 +37,7 @@ export default async function TemplatePage({ params }: { params: Promise<{ slug:
 
   return (
     <main className="mx-auto grid w-full max-w-5xl flex-1 gap-10 px-4 py-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
+      <SeoPageView page={`/templates/${template.slug}`} templateSlug={template.slug} />
       <div className="space-y-6">
         <div className="space-y-2">
           <p className="text-xs tracking-wide text-muted-foreground uppercase">{template.category}</p>
@@ -45,7 +47,7 @@ export default async function TemplatePage({ params }: { params: Promise<{ slug:
         <div className="rounded-xl border bg-muted/30 p-6">
           <FormView spec={template.spec} preview />
         </div>
-        <UseTemplateButton spec={template.spec} />
+        <UseTemplateButton spec={template.spec} page={`/templates/${template.slug}`} templateSlug={template.slug} />
       </div>
       <aside className="space-y-4">
         <h2 className="text-sm font-medium">Fields</h2>

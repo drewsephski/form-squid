@@ -4,15 +4,24 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { saveForm } from "@/app/lib/actions/forms-write";
+import { currentReferrer, trackFunnel, type FunnelProperties } from "@/app/lib/analytics";
 import { pendingSpecKey, type FormSpec } from "@/app/lib/definitions";
 import { authClient } from "@/lib/auth-client";
 
-interface UseTemplateButtonProps {
+interface UseTemplateButtonProps extends FunnelProperties {
   spec: FormSpec;
   label?: string;
+  intent?: "customize" | "template";
 }
 
-export function UseTemplateButton({ spec, label = "Use this template" }: UseTemplateButtonProps) {
+export function UseTemplateButton({
+  spec,
+  label = "Use this template",
+  intent = "template",
+  page,
+  templateSlug,
+  shadcnSlug,
+}: UseTemplateButtonProps) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -21,9 +30,13 @@ export function UseTemplateButton({ spec, label = "Use this template" }: UseTemp
     setPending(true);
     setError("");
     const session = await authClient.getSession();
-    if (session.data?.user) {
+    const authenticated = Boolean(session.data?.user);
+    const properties = { page, templateSlug, shadcnSlug, authenticated, referrer: currentReferrer() };
+    trackFunnel(intent === "customize" ? "customize_clicked" : "template_used", properties);
+    if (authenticated) {
       try {
         const saved = await saveForm(spec);
+        trackFunnel("form_created", properties);
         router.push(`/forms/${saved.id}`);
         return;
       } catch (caught) {

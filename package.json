@@ -24,6 +24,7 @@
     "@neon/functions": "^0.11.0",
     "@neondatabase/serverless": "^1.1.0",
     "@openrouter/ai-sdk-provider": "^3.1.0",
+    "@vercel/analytics": "^2.0.1",
     "ai": "^7.0.114",
     "better-auth": "^1.7.6",
     "class-variance-authority": "^0.7.1",
