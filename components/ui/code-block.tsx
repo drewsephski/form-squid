@@ -313,9 +313,16 @@ export function CodeBlock({
     () => tokenize(normalizedCode, getRules(language)),
     [normalizedCode, language],
   );
+  const showAll = !typing || reduceMotion;
+  const animationEpoch = `${typing}:${reduceMotion}:${inView}:${typingSpeed}:${normalizedCode}`;
+  const [epoch, setEpoch] = useState(animationEpoch);
   const [revealedCount, setRevealedCount] = useState(
-    typing ? 0 : normalizedCode.length,
+    showAll ? normalizedCode.length : 0,
   );
+  if (epoch !== animationEpoch) {
+    setEpoch(animationEpoch);
+    setRevealedCount(showAll ? normalizedCode.length : 0);
+  }
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -352,15 +359,10 @@ export function CodeBlock({
   }, [typing]);
 
   useEffect(() => {
-    if (!typing || reduceMotion) {
-      setRevealedCount(normalizedCode.length);
-      return;
-    }
-    if (!inView) {
+    if (!typing || reduceMotion || !inView) {
       return;
     }
 
-    setRevealedCount(0);
     let frameId = 0;
     let startTime: number | null = null;
     const charsPerMs = typingSpeed / MS_PER_SECOND;
@@ -436,7 +438,7 @@ export function CodeBlock({
                   className={cn(
                     "flex gap-3 border-l-2 border-transparent px-3",
                     isHighlighted &&
-                      "border-brand bg-foreground/[0.045] dark:bg-foreground/[0.07]",
+                    "border-brand bg-foreground/[0.045] dark:bg-foreground/[0.07]",
                   )}
                   key={lineNumber}
                 >
@@ -456,13 +458,13 @@ export function CodeBlock({
                     {lineTokens.length === 0
                       ? "\u00a0"
                       : lineTokens.map((token, tokenIndex) => (
-                          <span
-                            className={TOKEN_CLASS[token.type]}
-                            key={`${lineNumber}-${tokenIndex}`}
-                          >
-                            {token.value}
-                          </span>
-                        ))}
+                        <span
+                          className={TOKEN_CLASS[token.type]}
+                          key={`${lineNumber}-${tokenIndex}`}
+                        >
+                          {token.value}
+                        </span>
+                      ))}
                   </span>
                 </div>
               );

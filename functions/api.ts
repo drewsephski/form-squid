@@ -15,16 +15,32 @@ const corsHeaders = {
 
 const salt = requireRateLimitSalt(process.env.RATE_LIMIT_IP_SALT);
 
+const noStore = { "Cache-Control": "no-store" };
+
 const app = new Hono();
 
-app.get("/health", (c) => c.json({ ok: true }));
+app.get("/", (c) =>
+  c.json(
+    {
+      ok: true,
+      service: "FormSquid API",
+      version: "v1",
+      health: "/health",
+      ready: "/ready",
+    },
+    200,
+    noStore,
+  ),
+);
+
+app.get("/health", (c) => c.json({ ok: true }, 200, noStore));
 
 app.get("/ready", async (c) => {
   try {
     await db.execute(sql`SELECT 1`);
-    return c.json({ ok: true });
+    return c.json({ ok: true }, 200, noStore);
   } catch {
-    return c.json({ ok: false }, 503);
+    return c.json({ ok: false }, 503, noStore);
   }
 });
 
