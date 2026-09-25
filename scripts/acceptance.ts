@@ -134,7 +134,7 @@ async function connectionString(pooled: boolean) {
   return url;
 }
 
-async function useSignedInTemplate(page: Page, origin: string, databaseUrl: string) {
+async function verifySignedInTemplateFlow(page: Page, origin: string, databaseUrl: string) {
   await page.goto(`${origin}/templates/contact`);
   await page.getByRole("button", { name: "Use this template" }).click();
   await page.waitForURL(/\/forms\/.+/);
@@ -348,7 +348,7 @@ async function main() {
   const context = await browser.newContext();
   const page = await context.newPage();
   await publishForm(page, formsquidOrigin);
-  await useSignedInTemplate(page, formsquidOrigin, direct);
+  await verifySignedInTemplateFlow(page, formsquidOrigin, direct);
 
   const registryKey = (
     await run("psql", [
