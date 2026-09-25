@@ -389,6 +389,18 @@ describe("compiler", () => {
     expect(source).not.toContain("valueAsNumber");
   });
 
+  test("renders date fields with the shadcn calendar popover", () => {
+    const compiled = compileForm(allTypes, { submission: "formsquid", url: submitUrl });
+    expect(compiled.formSource).toContain("DateField");
+    expect(compiled.formSource).toContain("Calendar");
+    expect(compiled.formSource).toContain("Popover");
+    expect(compiled.formSource).not.toContain('type="date"');
+    expect(compiled.formSource).not.toContain("type={field.type === \"date\"");
+    expect(compiled.registryDependencies).toEqual(
+      expect.arrayContaining(["calendar", "popover"]),
+    );
+  });
+
   test("matches the runtime validator for the fixture payloads", () => {
     const cases: Array<[FormSpec, unknown]> = [
       [contact, { name: "Ada", email: "ada@work.com" }],

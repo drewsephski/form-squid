@@ -29,7 +29,7 @@ function embeddedAlgorithm(): string {
 }
 
 function registryDependencies(): string[] {
-  return ["button", "checkbox", "form", "input", "label", "radio-group", "select", "textarea"];
+  return ["button", "calendar", "checkbox", "form", "input", "label", "popover", "radio-group", "select", "textarea"];
 }
 
 function schemaSource(spec: FormSpec): string {
@@ -137,9 +137,13 @@ function formSource(spec: FormSpec, target: CompileTarget): string {
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { format } from "date-fns";
+import { ChevronDownIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -185,6 +189,69 @@ function parseNumberInput(raw: string): number | undefined {
   }
   const value = Number(raw);
   return Number.isFinite(value) ? value : undefined;
+}
+
+function parseIsoDate(value: string): Date | undefined {
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) {
+    return undefined;
+  }
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) {
+    return undefined;
+  }
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+    return undefined;
+  }
+  return date;
+}
+
+function toIsoDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return \`\${year}-\${month}-\${day}\`;
+}
+
+function DateField({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value?: unknown;
+  onChange: (value: unknown) => void;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const date = typeof value === "string" ? parseIsoDate(value) : undefined;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <Button
+            type="button"
+            variant="outline"
+            data-empty={!date}
+            className="w-full justify-between font-normal data-[empty=true]:text-muted-foreground"
+          />
+        }
+      >
+        {date ? format(date, "PPP") : <span>{placeholder ?? "Pick a date"}</span>}
+        <ChevronDownIcon data-icon="inline-end" />
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={date}
+          defaultMonth={date}
+          onSelect={(next) => {
+            onChange(next ? toIsoDate(next) : undefined);
+            setOpen(false);
+          }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 ${componentSignature}
@@ -325,9 +392,12 @@ function renderControl(field: (typeof spec.steps)[number]["fields"][number], con
   if (field.type === "checkbox") {
     return <Checkbox checked={Boolean(control.value)} onCheckedChange={(checked) => control.onChange(checked === true)} />;
   }
+  if (field.type === "date") {
+    return <DateField value={control.value} onChange={control.onChange} placeholder={field.placeholder} />;
+  }
   return (
     <Input
-      type={field.type === "number" ? "number" : field.type === "date" ? "date" : field.type === "email" ? "email" : "text"}
+      type={field.type === "number" ? "number" : field.type === "email" ? "email" : "text"}
       placeholder={field.placeholder}
       value={field.type === "number" ? (typeof control.value === "number" && Number.isFinite(control.value) ? control.value : "") : String(control.value ?? "")}
       onChange={(event) =>

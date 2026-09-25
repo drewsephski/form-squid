@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -121,6 +122,14 @@ export function FormView({ spec, submitUrl, preview = false }: FormViewProps) {
   }
 
   if (done) {
+    if (preview) {
+      return (
+        <div className={`${frameClass} space-y-4 rounded-xl px-6 py-8 text-center`} style={frameStyle} data-formsquid-theme={appearance.theme} role="status">
+          <p className="text-lg">Save and publish first to receive feedback.</p>
+          <p className="text-sm text-muted-foreground">This is a preview. Submissions are collected after you publish the form.</p>
+        </div>
+      );
+    }
     return (
       <div className={`${frameClass} space-y-4 rounded-xl px-6 py-8 text-center`} style={frameStyle} data-formsquid-theme={appearance.theme}>
         <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-primary/15 text-lg text-primary" aria-hidden="true">
@@ -251,7 +260,17 @@ function FieldControl({ field, value, error, onChange }: FieldControlProps) {
       {field.type === "checkbox" ? (
         <Checkbox id={id} checked={value === true} onCheckedChange={(checked) => onChange(checked === true)} aria-invalid={Boolean(error)} aria-required={field.required} />
       ) : null}
-      {field.type === "text" || field.type === "email" || field.type === "number" || field.type === "date" ? (
+      {field.type === "date" ? (
+        <DatePicker
+          id={id}
+          value={typeof value === "string" ? value : undefined}
+          placeholder={field.placeholder ?? "Pick a date"}
+          aria-invalid={Boolean(error)}
+          aria-required={field.required}
+          onChange={(next) => onChange(next)}
+        />
+      ) : null}
+      {field.type === "text" || field.type === "email" || field.type === "number" ? (
         <Input
           id={id}
           type={field.type === "text" ? "text" : field.type}
