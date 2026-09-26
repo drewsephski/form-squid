@@ -6,6 +6,7 @@ import * as schema from "../db/schema";
 import { passwordResetEmail, sendAuthEmail } from "../server/mail";
 
 const origin = process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
+const appOrigin = process.env.NEXT_PUBLIC_APP_ORIGIN ?? origin;
 
 export const auth = betterAuth({
   appName: "FormSquid",
@@ -23,7 +24,22 @@ export const auth = betterAuth({
       after(() => delivery);
     },
   },
-  trustedOrigins: [origin],
+  socialProviders: {
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID as string,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+      prompt: "select_account",
+    },
+  },
+  account: {
+    accountLinking: {
+      enabled: true,
+      trustedProviders: ["google"],
+      // Email verification is off for password sign-up; allow linking the same address to Google.
+      requireLocalEmailVerified: false,
+    },
+  },
+  trustedOrigins: [...new Set([origin, appOrigin, "http://localhost:3000"])],
   advanced: {
     crossSubDomainCookies: {
       enabled: false,

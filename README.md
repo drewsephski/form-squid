@@ -51,6 +51,8 @@ Names only — never commit real values:
 - `DATABASE_URL_UNPOOLED`
 - `BETTER_AUTH_SECRET`
 - `BETTER_AUTH_URL`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
 - `NEXT_PUBLIC_APP_ORIGIN`
 - `NEXT_PUBLIC_ROOT_DOMAIN`
 - `FORM_API_ORIGIN`
@@ -62,6 +64,13 @@ Optional:
 - `RESEND_API_KEY`
 - `RESEND_FROM`
 - `RESEND_AUTH_FROM`
+
+Google OAuth redirect URIs (Google Cloud Console → Credentials → OAuth client):
+
+- Local: `{BETTER_AUTH_URL}/api/auth/callback/google` (e.g. `http://localhost:3000/api/auth/callback/google`)
+- Production: `https://formsquid.com/api/auth/callback/google`
+
+`BETTER_AUTH_URL` must match the origin Google redirects to, or you will get `redirect_uri_mismatch`.
 
 ### Checks
 
