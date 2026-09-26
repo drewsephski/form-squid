@@ -576,7 +576,13 @@ export function Editor({ form }: { form: EditorForm }) {
             <TabsTrigger value="integrations">Integrations</TabsTrigger>
             <TabsTrigger value="code">Code</TabsTrigger>
           </TabsList>
-          <TabsContent value="submissions" className="min-w-0 space-y-4">
+          {/* Stack panels in one grid cell so height stays equal across tabs (no layout shift). */}
+          <div className="grid min-w-0 [&>[data-slot=tabs-content]]:col-start-1 [&>[data-slot=tabs-content]]:row-start-1">
+          <TabsContent
+            value="submissions"
+            keepMounted
+            className="min-w-0 space-y-4 [&[hidden]]:block [&[hidden]]:invisible [&[hidden]]:pointer-events-none"
+          >
             <form className="flex gap-2" onSubmit={(event) => void handleSaveNotifyEmail(event)}>
               <Input
                 ref={notifyEmailRef}
@@ -757,10 +763,18 @@ export function Editor({ form }: { form: EditorForm }) {
               </div>
             ) : null}
           </TabsContent>
-          <TabsContent value="integrations" className="min-w-0">
+          <TabsContent
+            value="integrations"
+            keepMounted
+            className="min-w-0 [&[hidden]]:block [&[hidden]]:invisible [&[hidden]]:pointer-events-none"
+          >
             <IntegrationsPanel formId={form.id} initialWebhook={form.webhook} onWebhookChange={setWebhook} />
           </TabsContent>
-          <TabsContent value="code" className="min-w-0 space-y-4">
+          <TabsContent
+            value="code"
+            keepMounted
+            className="min-w-0 space-y-4 [&[hidden]]:block [&[hidden]]:invisible [&[hidden]]:pointer-events-none"
+          >
             <div className="min-w-0 space-y-2">
               <h2 className="text-sm font-medium">Install published form</h2>
               {published ? (
@@ -809,6 +823,7 @@ export function Editor({ form }: { form: EditorForm }) {
               <p className="text-sm text-muted-foreground">Copy or download to generate the source.</p>
             )}
           </TabsContent>
+          </div>
         </Tabs>
       </div>
 
