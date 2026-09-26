@@ -8,6 +8,7 @@ import { formSpecSchema, type FormSpec } from "@/app/lib/definitions";
 import { requireFormOwner, requireUser } from "@/app/lib/auth-guards";
 import { assertPublicSlug, reservedSlugs } from "@/app/lib/reserved-slugs";
 import { addressAfterDraftSave, addressAfterPublish } from "@/app/lib/slug-address";
+import { deleteFormWithStorage } from "@/server/delete-lifecycle";
 
 function slugify(title: string) {
   const base = title
@@ -136,7 +137,7 @@ export async function duplicateForm(formId: string) {
 export async function deleteForm(formId: string) {
   const user = await requireUser();
   await requireFormOwner(formId, user.id);
-  await db.delete(forms).where(eq(forms.id, formId));
+  await deleteFormWithStorage(db, formId);
 }
 
 export async function updateNotifyEmail(formId: string, notifyEmail: string) {

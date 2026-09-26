@@ -1,13 +1,17 @@
 /**
  * Temporary production smoke for file uploads.
  * Signs up a disposable account, seeds a published PDF form for that owner,
- * submits via the hosted form, checks inbox/DB, then deletes the form/user.
+ * submits via the hosted form, checks inbox/DB, deletes the form via the product
+ * delete action (storage + DB), asserts cleanup, then removes the smoke user.
  */
+import { ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
 import { spawn } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { chromium } from "playwright";
+import { submissionUploadsBucket } from "../app/lib/upload-limits";
+import { deleteStoredPrefix, formUploadsPrefix } from "../server/storage";
 
 const root = process.cwd();
 const projectId = "patient-voice-97966600";
@@ -74,6 +78,66 @@ async function sql(direct: string, query: string) {
   return (await run("psql", [direct, "-t", "-A", "-v", "ON_ERROR_STOP=1", "-c", query])).trim();
 }
 
+async function countObjectsUnderPrefix(prefix: string) {
+  const client = new S3Client({ forcePathStyle: true });
+  let total = 0;
+  let continuationToken: string | undefined;
+  do {
+    const listed = await client.send(
+      new ListObjectsV2Command({
+        Bucket: submissionUploadsBucket,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      }),
+    );
+    total += listed.Contents?.length ?? 0;
+    continuationToken = listed.IsTruncated ? listed.NextContinuationToken : undefined;
+  } while (continuationToken);
+  return total;
+}
+
+async function deleteFormViaProductUi(
+  page: Awaited<ReturnType<Awaited<ReturnType<typeof chromium.launch>>["newPage"]>>,
+  formTitle: string,
+) {
+  await page.goto("https://formsquid.com/forms");
+  await page.getByText("My forms", { exact: false }).first().waitFor({ timeout: 30_000 });
+  const row = page.locator("li").filter({ hasText: formTitle }).first();
+  await row.waitFor({ timeout: 30_000 });
+  await row.getByLabel(`${formTitle} actions`).click();
+  await page.getByRole("menuitem", { name: "Delete" }).click();
+  const dialog = page.getByRole("alertdialog");
+  await dialog.waitFor({ timeout: 10_000 });
+  await dialog.getByRole("button", { name: "Delete" }).click();
+  await row.waitFor({ state: "detached", timeout: 60_000 });
+}
+
+async function assertFormFullyCleaned(direct: string, formId: string) {
+  const formsLeft = await sql(direct, `select count(*)::text from forms where id = '${formId}'`);
+  if (formsLeft !== "0") throw new Error(`Form row still present after product delete: ${formsLeft}`);
+
+  const submissionsLeft = await sql(
+    direct,
+    `select count(*)::text from submissions where form_id = '${formId}'`,
+  );
+  if (submissionsLeft !== "0") {
+    throw new Error(`Submission rows still present after product delete: ${submissionsLeft}`);
+  }
+
+  const filesLeft = await sql(
+    direct,
+    `select count(*)::text from submission_files where form_id = '${formId}'`,
+  );
+  if (filesLeft !== "0") {
+    throw new Error(`submission_files rows still present after product delete: ${filesLeft}`);
+  }
+
+  const objectsLeft = await countObjectsUnderPrefix(formUploadsPrefix(formId));
+  if (objectsLeft !== 0) {
+    throw new Error(`Storage objects still present under form prefix: ${objectsLeft}`);
+  }
+}
+
 async function main() {
   await mkdir(path.dirname(pdfPath), { recursive: true });
   await writeFile(pdfPath, tinyPdf);
@@ -82,6 +146,7 @@ async function main() {
   const page = await browser.newPage();
   let formId = "";
   let userId = "";
+  let formDeletedViaProduct = false;
 
   try {
     await page.goto("https://formsquid.com/sign-up");
@@ -199,14 +264,26 @@ async function main() {
     );
     if (orphans !== "0") throw new Error(`Unexpected orphan pending uploads: ${orphans}`);
 
-    console.log("Production upload smoke passed.");
+    console.log("Production upload smoke passed. Deleting form via product UI…");
+
+    await deleteFormViaProductUi(page, resumeSpec.title);
+    formDeletedViaProduct = true;
+    await assertFormFullyCleaned(direct, formId);
+    console.log("Product form delete cleaned DB rows and storage prefix.");
   } finally {
     await browser.close().catch(() => undefined);
     await unlink(pdfPath).catch(() => undefined);
+
+    // Safety net only for this disposable smoke form/user — never touch unrelated data.
     if (formId) {
-      await sql(direct, `delete from forms where id = '${formId}'`).catch((error: unknown) => {
-        console.error("form cleanup failed", error);
+      await deleteStoredPrefix(formUploadsPrefix(formId)).catch((error: unknown) => {
+        console.error("fallback storage prefix cleanup failed", error);
       });
+      if (!formDeletedViaProduct) {
+        await sql(direct, `delete from forms where id = '${formId}'`).catch((error: unknown) => {
+          console.error("fallback form cleanup failed", error);
+        });
+      }
     }
     if (userId) {
       await sql(direct, `delete from "user" where id = '${userId}'`).catch((error: unknown) => {
@@ -215,7 +292,7 @@ async function main() {
     } else {
       await sql(direct, `delete from "user" where email = '${email}'`).catch(() => undefined);
     }
-    console.log("Cleanup attempted for temporary smoke account/form.");
+    console.log("Cleanup finished for temporary smoke account/form.");
   }
 }
 
