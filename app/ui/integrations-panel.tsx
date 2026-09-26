@@ -14,6 +14,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CodeBlock } from "@/components/ui/code-block";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trackFunnel } from "@/app/lib/analytics";
@@ -77,6 +85,7 @@ export function IntegrationsPanel({ formId, initialWebhook, onWebhookChange }: I
   const [pending, setPending] = useState(false);
   const [testResult, setTestResult] = useState("");
   const [rotateOpen, setRotateOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   async function refresh(preserveRevealedSecret = false) {
     const next = await getWebhook(formId);
@@ -186,9 +195,23 @@ export function IntegrationsPanel({ formId, initialWebhook, onWebhookChange }: I
   return (
     <div className="min-w-0 space-y-6">
       <div className="space-y-1">
-        <h2 className="text-sm font-medium">Webhook</h2>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-sm font-medium">Webhook</h2>
+          <Button
+            type="button"
+            variant="link"
+            className="h-auto p-0 text-sm text-muted-foreground"
+            aria-haspopup="dialog"
+            aria-expanded={helpOpen}
+            onClick={() => setHelpOpen(true)}
+          >
+            How this works
+          </Button>
+        </div>
         {!webhook ? (
-          <p className="text-sm text-muted-foreground">Send every new response to your API.</p>
+          <p className="text-sm text-muted-foreground">
+            Forward each new response to your own tools or API.
+          </p>
         ) : (
           <p className="text-sm text-muted-foreground">
             FormSquid POSTs signed <code className="font-mono text-xs">submission.created</code> events to this URL.
@@ -317,6 +340,46 @@ export function IntegrationsPanel({ formId, initialWebhook, onWebhookChange }: I
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
+        <DialogContent className="sm:max-w-md" aria-describedby="webhook-help-body">
+          <DialogHeader>
+            <DialogTitle>Forward responses automatically</DialogTitle>
+          </DialogHeader>
+          <div id="webhook-help-body" className="space-y-4 text-sm text-muted-foreground">
+            <div className="space-y-1">
+              <p className="font-medium text-foreground">Skip the busywork</p>
+              <p>
+                When someone submits, FormSquid sends that response to a URL you control. Use it to open a
+                ticket, update a CRM, ping Slack, or trigger Zapier/Make — without copy-pasting from the inbox.
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="font-medium text-foreground">Email vs webhook</p>
+              <p>
+                Want a heads-up? Add an email on the Submissions tab. Want your systems to react without you?
+                Use a webhook.
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="font-medium text-foreground">What you need</p>
+              <p>
+                An HTTPS URL that accepts POST JSON. If you do not have one yet, ask your developer or use an
+                automation tool that gives you a webhook URL.
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="font-medium text-foreground">For your developer</p>
+              <p>
+                FormSquid signs each delivery. Your endpoint can verify the signing secret shown after you save.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose render={<Button type="button" />}>Got it</DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
