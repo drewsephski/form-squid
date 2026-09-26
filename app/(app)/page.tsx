@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { Metadata } from "next";
 import { Generator } from "@/app/ui/generator";
 import { SeoPageView } from "@/app/ui/seo-page-view";
@@ -23,19 +22,6 @@ export default function Home() {
           </h1>
           <p className="mx-auto max-w-xl text-lg text-muted-foreground">
             Prompt once and get a live hosted form, shadcn/ui source, validation, and a submissions inbox.
-          </p>
-          <p className="text-sm text-muted-foreground">
-            <Link href="/shadcn/form-builder" className="underline-offset-4 hover:underline">
-              Browse shadcn form examples
-            </Link>
-            {" · "}
-            <Link href="/privacy" className="underline-offset-4 hover:underline">
-              Privacy Policy
-            </Link>
-            {" · "}
-            <Link href="/terms" className="underline-offset-4 hover:underline">
-              Terms of Service
-            </Link>
           </p>
         </div>
         <Generator />
