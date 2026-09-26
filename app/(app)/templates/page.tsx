@@ -33,7 +33,7 @@ export default function TemplatesPage() {
               <div className="space-y-1">
                 <p className="text-xs tracking-wide text-muted-foreground uppercase">{template.category}</p>
                 <h2 className="font-medium">{template.name}</h2>
-                <p className="min-h-[2.5rem] text-sm text-muted-foreground">{template.description}</p>
+                <p className="truncate text-sm text-muted-foreground">{template.description}</p>
               </div>
             </Link>
           </li>

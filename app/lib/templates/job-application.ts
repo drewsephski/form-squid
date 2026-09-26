@@ -3,7 +3,7 @@ import type { FormTemplate } from "./types";
 export const jobApplication: FormTemplate = {
   slug: "job-application",
   name: "Job application",
-  description: "Collect applicant details, portfolio links, experience, and notes of interest.",
+  description: "Contact details, links, experience, and interest.",
   category: "Hiring",
   spec: {
     schemaVersion: 1,

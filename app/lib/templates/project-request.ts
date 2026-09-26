@@ -3,7 +3,7 @@ import type { FormTemplate } from "./types";
 export const projectRequest: FormTemplate = {
   slug: "project-request",
   name: "Project request",
-  description: "Capture the work type, deadline, and a short brief for estimating the project.",
+  description: "Work type, deadline, and a short project brief.",
   category: "Business",
   spec: {
     schemaVersion: 1,

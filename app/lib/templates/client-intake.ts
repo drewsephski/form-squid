@@ -3,7 +3,7 @@ import type { FormTemplate } from "./types";
 export const clientIntake: FormTemplate = {
   slug: "client-intake",
   name: "Client intake",
-  description: "Collect project goals, timeline, budget, and contact details from new clients.",
+  description: "Project goals, timeline, budget, and contact details.",
   category: "Business",
   spec: {
     schemaVersion: 1,

@@ -3,7 +3,7 @@ import type { FormTemplate } from "./types";
 export const waitlist: FormTemplate = {
   slug: "waitlist",
   name: "Waitlist",
-  description: "Collect a name, email, company, and what someone wants to use the product for.",
+  description: "Name, email, company, and intended product use.",
   category: "Product",
   spec: {
     schemaVersion: 1,
