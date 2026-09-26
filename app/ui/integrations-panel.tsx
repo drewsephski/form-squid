@@ -64,9 +64,10 @@ function verify(secret, header, rawBody) {
 interface IntegrationsPanelProps {
   formId: string;
   initialWebhook: WebhookPanelState | null;
+  onWebhookChange?: (webhook: WebhookPanelState | null) => void;
 }
 
-export function IntegrationsPanel({ formId, initialWebhook }: IntegrationsPanelProps) {
+export function IntegrationsPanel({ formId, initialWebhook, onWebhookChange }: IntegrationsPanelProps) {
   const [webhook, setWebhook] = useState<WebhookPanelState | null>(initialWebhook);
   const [url, setUrl] = useState(initialWebhook?.url ?? "");
   const [enabled, setEnabled] = useState(initialWebhook?.enabled ?? true);
@@ -80,6 +81,7 @@ export function IntegrationsPanel({ formId, initialWebhook }: IntegrationsPanelP
   async function refresh(preserveRevealedSecret = false) {
     const next = await getWebhook(formId);
     setWebhook(next);
+    onWebhookChange?.(next);
     if (next) {
       setUrl(next.url);
       setEnabled(next.enabled);

@@ -162,7 +162,9 @@ async function publishForm(page: Page, origin: string) {
   await page.getByRole("tab", { name: "Form" }).click();
   await page.locator("#slug").fill(slug);
   await page.getByRole("button", { name: "Publish" }).click();
-  await page.getByText("Published", { exact: true }).waitFor();
+  await page.getByText("Published", { exact: true }).first().waitFor();
+  await page.getByText("Form published", { exact: true }).waitFor();
+  await page.getByRole("region", { name: "Launch your form" }).waitFor();
 }
 
 async function installRegistry(origin: string, registryKey: string, consumerDir: string, submitUrl: string) {
