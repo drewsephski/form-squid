@@ -3,7 +3,7 @@ import type { FormTemplate } from "./types";
 export const rsvp: FormTemplate = {
   slug: "rsvp",
   name: "RSVP",
-  description: "Ask guests whether they are coming and, if so, what they would like to eat.",
+  description: "Ask guests if they are coming and, when they are, what they would like to eat.",
   category: "Events",
   spec: {
     schemaVersion: 1,

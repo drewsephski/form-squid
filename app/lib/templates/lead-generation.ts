@@ -3,7 +3,7 @@ import type { FormTemplate } from "./types";
 export const leadGeneration: FormTemplate = {
   slug: "lead-generation",
   name: "Lead generation",
-  description: "Ask for a name, work email, company size, and the problem they want solved.",
+  description: "Collect a name, work email, company size, and the problem they need help with.",
   category: "Marketing",
   spec: {
     schemaVersion: 1,

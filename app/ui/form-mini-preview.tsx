@@ -4,7 +4,7 @@ import type { FormSpec } from "@/app/lib/definitions";
 import { FormView } from "@/app/ui/form-view";
 
 const sizes = {
-  card: { height: "h-56", scale: 0.42 },
+  card: { height: "h-64", scale: 0.42 },
   thumb: { height: "h-28", scale: 0.36 },
 } as const;
 

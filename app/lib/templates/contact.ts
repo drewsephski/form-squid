@@ -3,7 +3,7 @@ import type { FormTemplate } from "./types";
 export const contact: FormTemplate = {
   slug: "contact",
   name: "Contact",
-  description: "A short contact form with name, email, and a message.",
+  description: "Collect a name, email, and short message so new inquiries can reach your team.",
   category: "General",
   spec: {
     schemaVersion: 1,

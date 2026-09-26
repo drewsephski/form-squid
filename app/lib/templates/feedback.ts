@@ -3,7 +3,7 @@ import type { FormTemplate } from "./types";
 export const feedback: FormTemplate = {
   slug: "feedback",
   name: "Feedback",
-  description: "A short survey for satisfaction, what went well, and what could be better.",
+  description: "Collect satisfaction scores, what went well, and ideas for what to improve on.",
   category: "Product",
   spec: {
     schemaVersion: 1,
