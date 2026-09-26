@@ -10,6 +10,9 @@ if (process.env.RESEND_FROM) {
 if (process.env.RATE_LIMIT_IP_SALT) {
   functionEnv.RATE_LIMIT_IP_SALT = process.env.RATE_LIMIT_IP_SALT;
 }
+if (process.env.NEXT_PUBLIC_APP_ORIGIN) {
+  functionEnv.NEXT_PUBLIC_APP_ORIGIN = process.env.NEXT_PUBLIC_APP_ORIGIN;
+}
 
 export default defineConfig({
   buckets: {

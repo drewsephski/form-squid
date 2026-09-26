@@ -1,5 +1,10 @@
+const productionAppOrigin = "https://formsquid.com";
+
 export function appOrigin() {
-  return process.env.NEXT_PUBLIC_APP_ORIGIN ?? "http://localhost:3000";
+  const configured = process.env.NEXT_PUBLIC_APP_ORIGIN?.replace(/\/$/, "");
+  if (configured) return configured;
+  if (process.env.NODE_ENV === "production") return productionAppOrigin;
+  return "http://localhost:3000";
 }
 
 const productionApiOrigin = "https://api.formsquid.com";

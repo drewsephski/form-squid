@@ -28,6 +28,14 @@ export default function Home() {
             <Link href="/shadcn/form-builder" className="underline-offset-4 hover:underline">
               Browse shadcn form examples
             </Link>
+            {" · "}
+            <Link href="/privacy" className="underline-offset-4 hover:underline">
+              Privacy Policy
+            </Link>
+            {" · "}
+            <Link href="/terms" className="underline-offset-4 hover:underline">
+              Terms of Service
+            </Link>
           </p>
         </div>
         <Generator />
