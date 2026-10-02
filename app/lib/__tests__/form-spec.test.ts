@@ -337,6 +337,47 @@ describe("validateSubmission", () => {
     expect(validateSubmission(form, { budget: Number.NaN }).ok).toBe(false);
   });
 
+  test("treats owned undefined optional controls as absent and defaults optional checkboxes", () => {
+    const form = spec({
+      schemaVersion: 1,
+      title: "Optional fields",
+      submitLabel: "Send",
+      successMessage: "Ok",
+      steps: [{
+        id: "main",
+        title: "Main",
+        fields: [
+          { id: "name", type: "text", label: "Name", required: true },
+          { id: "email", type: "email", label: "Email", required: false },
+          { id: "notes", type: "textarea", label: "Notes", required: false },
+          { id: "budget", type: "number", label: "Budget", required: false },
+          { id: "start", type: "date", label: "Start", required: false },
+          { id: "subscribe", type: "checkbox", label: "Subscribe", required: false },
+        ],
+      }],
+    });
+    const payload = {
+      name: "Ada",
+      email: undefined,
+      notes: undefined,
+      budget: undefined,
+      start: undefined,
+      subscribe: undefined,
+    };
+    expect(validateSubmission(form, payload)).toEqual({
+      ok: true,
+      data: { name: "Ada", subscribe: false },
+    });
+    expectParity(form, payload);
+  });
+
+  test("treats an owned undefined required control as missing", () => {
+    const payload = { name: undefined, email: "ada@work.com" };
+    const result = validateSubmission(contact, payload);
+    expect(result).toEqual({ ok: false, errors: [{ path: "name", message: "This field is required." }] });
+    expectParity(contact, payload);
+  });
+
   test("rejects unknown keys", () => {
     expect(validateSubmission(contact, { name: "Ada", email: "ada@work.com", extra: "no" }).ok).toBe(false);
   });

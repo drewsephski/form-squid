@@ -25,6 +25,9 @@ interface FileFieldControlProps {
   hosted: boolean;
   value: UploadedFileValue | UploadedFileValue[] | File | File[] | undefined;
   error?: string;
+  disabled?: boolean;
+  describedBy?: string;
+  onUploadStateChange?: (fieldId: string, state: { pending: boolean; error: boolean }) => void;
   onChange: (value: UploadedFileValue | UploadedFileValue[] | File | File[] | undefined) => void;
 }
 
@@ -101,6 +104,9 @@ export function FileFieldControl({
   hosted,
   value,
   error,
+  disabled = false,
+  describedBy,
+  onUploadStateChange,
   onChange,
 }: FileFieldControlProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -109,27 +115,40 @@ export function FileFieldControl({
   const settings = fileFieldSettings(field);
   const files = asList(value);
   const displayError = localError || error;
+  const uploadErrorId = `${id}-upload-error`;
+  const inputDescribedBy = [describedBy, localError ? uploadErrorId : undefined].filter(Boolean).join(" ") || undefined;
 
   async function handleFiles(list: FileList | null) {
-    if (!list || list.length === 0) {
+    if (disabled || pending || !list || list.length === 0) {
       return;
     }
     setLocalError("");
-    const selected = Array.from(list).slice(0, settings.maxFiles);
+    if (list.length > settings.maxFiles) {
+      const message = settings.maxFiles === 1 ? "Choose one file." : `Choose up to ${settings.maxFiles} files.`;
+      setLocalError(message);
+      onUploadStateChange?.(field.id, { pending: false, error: true });
+      if (inputRef.current) inputRef.current.value = "";
+      return;
+    }
+    const selected = Array.from(list);
     if (hosted) {
       if (!uploadUrl) {
         setLocalError("Uploads are unavailable.");
+        onUploadStateChange?.(field.id, { pending: false, error: true });
         return;
       }
+      onUploadStateChange?.(field.id, { pending: true, error: false });
       setPending(true);
       try {
         const uploaded: UploadedFileValue[] = [];
         for (const file of selected) {
           uploaded.push(await authorizeAndUpload({ uploadUrl, fieldId: field.id, file }));
         }
+        onUploadStateChange?.(field.id, { pending: false, error: false });
         onChange(settings.maxFiles === 1 ? uploaded[0] : uploaded);
       } catch (uploadError) {
         setLocalError(uploadError instanceof Error ? uploadError.message : "Upload failed.");
+        onUploadStateChange?.(field.id, { pending: false, error: true });
       } finally {
         setPending(false);
         if (inputRef.current) {
@@ -140,6 +159,7 @@ export function FileFieldControl({
     }
 
     onChange(settings.maxFiles === 1 ? selected[0] : selected);
+    onUploadStateChange?.(field.id, { pending: false, error: false });
     if (inputRef.current) {
       inputRef.current.value = "";
     }
@@ -149,6 +169,8 @@ export function FileFieldControl({
     const next = files.filter((_, itemIndex) => itemIndex !== index);
     if (next.length === 0) {
       onChange(undefined);
+      setLocalError("");
+      onUploadStateChange?.(field.id, { pending: false, error: false });
       return;
     }
     onChange(settings.maxFiles === 1 ? next[0] : (next as UploadedFileValue[] | File[]));
@@ -162,15 +184,16 @@ export function FileFieldControl({
         type="file"
         accept={acceptAttribute(settings.accept)}
         multiple={settings.maxFiles > 1}
-        disabled={pending}
+        disabled={pending || disabled}
         aria-invalid={Boolean(displayError)}
         aria-required={field.required}
         aria-label={field.label}
+        aria-describedby={inputDescribedBy}
         onChange={(event) => {
           void handleFiles(event.target.files);
         }}
       />
-      {pending ? <p className="text-sm text-muted-foreground">Uploading…</p> : null}
+      {pending ? <p role="status" className="text-sm text-muted-foreground">Uploading…</p> : null}
       {files.length > 0 ? (
         <ul className="space-y-1">
           {files.map((file, index) => {
@@ -181,7 +204,7 @@ export function FileFieldControl({
                 <span className="min-w-0 truncate">
                   {name} · {formatFileSize(size)}
                 </span>
-                <Button type="button" variant="ghost" size="sm" onClick={() => handleRemove(index)} aria-label={`Remove ${name}`}>
+                <Button type="button" variant="ghost" size="sm" onClick={() => handleRemove(index)} disabled={disabled} aria-label={`Remove ${name}`}>
                   Remove
                 </Button>
               </li>
@@ -189,7 +212,22 @@ export function FileFieldControl({
           })}
         </ul>
       ) : null}
-      {displayError ? <p className="text-sm text-destructive">{displayError}</p> : null}
+      {localError ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={disabled || pending}
+          onClick={() => {
+            onChange(undefined);
+            setLocalError("");
+            onUploadStateChange?.(field.id, { pending: false, error: false });
+          }}
+        >
+          Clear file selection
+        </Button>
+      ) : null}
+      {displayError ? <p id={localError ? uploadErrorId : `${id}-error`} role="alert" className="text-sm text-destructive">{displayError}</p> : null}
     </div>
   );
 }

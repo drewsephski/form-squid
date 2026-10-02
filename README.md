@@ -19,10 +19,16 @@ Browse the shadcn registry examples at `/shadcn/form-builder`.
 ## Features
 
 - Hosted public forms with published versioning
+- Editor autosave with device recovery for unsaved edits, explicit restore/discard, and save retry
+- File uploads block navigation/submission until complete; failed selections can be retried or cleared
 - shadcn/ui registry export (`React Hook Form` + Zod)
 - Submissions inbox, CSV export, and optional Resend email notifications
 - One signed webhook per form (`submission.created`) with HMAC verification
 - AI-assisted editing in the form editor
+
+### CSV exports
+
+The form editor downloads every response as a CSV from the authenticated `GET /api/forms/{formId}/submissions/export` endpoint. The export streams rows in pages from a fixed starting watermark, uses field labels from each form version, and keeps renamed fields under one column with their label history. If different fields share a label, their field IDs are added to the headers. CSV cells that could be interpreted as spreadsheet formulas are prefixed with an apostrophe before quoting.
 
 ## Stack
 

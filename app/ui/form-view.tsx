@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { AnimateHeight } from "@/components/ui/animate-height";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -38,6 +38,11 @@ export function FormView({ spec, submitUrl, uploadUrl, preview = false, compact 
   const [done, setDone] = useState(false);
   const [pending, setPending] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [pendingUploadCount, setPendingUploadCount] = useState(0);
+  const [uploadIssueCount, setUploadIssueCount] = useState(0);
+  const pendingUploadFields = useRef(new Set<string>());
+  const uploadIssueFields = useRef(new Set<string>());
+  const submissionLock = useRef(false);
   const step = spec.steps[stepIndex];
   const appearance = resolveAppearance(spec);
   const frameClass = appearanceClassName(appearance);
@@ -66,14 +71,23 @@ export function FormView({ spec, submitUrl, uploadUrl, preview = false, compact 
   }
 
   function handleValue(id: string, value: FormValue | undefined) {
-    setValues((current) => {
-      if (value === undefined) {
-        const next = { ...current };
-        delete next[id];
-        return next;
+    if (submissionLock.current || pendingUploadFields.current.size > 0) {
+      return;
+    }
+    const nextValues = { ...values };
+    if (value === undefined) {
+      delete nextValues[id];
+    } else {
+      nextValues[id] = value;
+    }
+    setValues(nextValues);
+    for (const fieldId of uploadIssueFields.current) {
+      const field = spec.steps.flatMap((item) => item.fields).find((item) => item.id === fieldId);
+      if (field && !fieldIsVisible(spec, nextValues, field)) {
+        uploadIssueFields.current.delete(fieldId);
       }
-      return { ...current, [id]: value };
-    });
+    }
+    setUploadIssueCount(uploadIssueFields.current.size);
     setErrors((current) => {
       if (!current[id]) {
         return current;
@@ -103,6 +117,14 @@ export function FormView({ spec, submitUrl, uploadUrl, preview = false, compact 
   }
 
   function handleNext() {
+    if (pendingUploadFields.current.size > 0) {
+      setSubmitError("Wait for the file upload to finish before continuing.");
+      return;
+    }
+    if (uploadIssueFields.current.size > 0) {
+      setSubmitError("Retry or remove the file with an upload error before continuing.");
+      return;
+    }
     const result = validateSubmission(spec, payloadFromValues(), { stepId: step.id });
     if (!result.ok) {
       showErrors(Object.fromEntries(result.errors.filter((error) => error.path).map((error) => [error.path, error.message])));
@@ -113,6 +135,17 @@ export function FormView({ spec, submitUrl, uploadUrl, preview = false, compact 
   }
 
   async function handleSubmit() {
+    if (submissionLock.current) {
+      return;
+    }
+    if (pendingUploadFields.current.size > 0) {
+      setSubmitError("Wait for the file upload to finish before submitting.");
+      return;
+    }
+    if (uploadIssueFields.current.size > 0) {
+      setSubmitError("Retry or remove the file with an upload error before submitting.");
+      return;
+    }
     const result = validateSubmission(spec, payloadFromValues());
     if (!result.ok) {
       showErrors(Object.fromEntries(result.errors.filter((error) => error.path).map((error) => [error.path, error.message])));
@@ -126,6 +159,7 @@ export function FormView({ spec, submitUrl, uploadUrl, preview = false, compact 
       setDone(true);
       return;
     }
+    submissionLock.current = true;
     setPending(true);
     setSubmitError("");
     try {
@@ -143,8 +177,25 @@ export function FormView({ spec, submitUrl, uploadUrl, preview = false, compact 
     } catch {
       setSubmitError("Could not submit. Try again.");
     } finally {
+      submissionLock.current = false;
       setPending(false);
     }
+  }
+
+  function handleUploadStateChange(fieldId: string, state: { pending: boolean; error: boolean }) {
+    if (state.pending) {
+      pendingUploadFields.current.add(fieldId);
+    } else {
+      pendingUploadFields.current.delete(fieldId);
+    }
+    if (state.error) {
+      uploadIssueFields.current.add(fieldId);
+    } else {
+      uploadIssueFields.current.delete(fieldId);
+    }
+    setPendingUploadCount(pendingUploadFields.current.size);
+    setUploadIssueCount(uploadIssueFields.current.size);
+    setSubmitError("");
   }
 
   const progress = ((stepIndex + 1) / spec.steps.length) * 100;
@@ -213,6 +264,8 @@ export function FormView({ spec, submitUrl, uploadUrl, preview = false, compact 
             error={errors[field.id]}
             uploadUrl={uploadUrl}
             hosted={Boolean(submitUrl) && !preview}
+            disabled={pending || pendingUploadCount > 0}
+            onUploadStateChange={handleUploadStateChange}
             onChange={(value) => handleValue(field.id, value)}
           />
         ))}
@@ -226,13 +279,13 @@ export function FormView({ spec, submitUrl, uploadUrl, preview = false, compact 
         />
         <div className="flex gap-2">
           {stepIndex > 0 ? (
-            <Button type="button" variant="outline" className="shrink-0" onClick={() => setStepIndex((current) => current - 1)}>
+            <Button type="button" variant="outline" className="shrink-0" disabled={pending || pendingUploadCount > 0 || uploadIssueCount > 0} onClick={() => setStepIndex((current) => current - 1)}>
               Back
             </Button>
           ) : null}
           <div className={actionSlotClass}>
-            <Button type="submit" className={actionClass} disabled={pending}>
-              {pending ? "Sending…" : stepIndex < spec.steps.length - 1 ? "Next" : spec.submitLabel}
+            <Button type="submit" className={actionClass} disabled={pending || pendingUploadCount > 0 || uploadIssueCount > 0}>
+              {pending ? "Sending…" : pendingUploadCount > 0 ? "Uploading…" : uploadIssueCount > 0 ? "Fix file upload" : stepIndex < spec.steps.length - 1 ? "Next" : spec.submitLabel}
             </Button>
           </div>
         </div>
@@ -255,11 +308,16 @@ interface FieldControlProps {
   error?: string;
   uploadUrl?: string;
   hosted: boolean;
+  disabled: boolean;
+  onUploadStateChange: (fieldId: string, state: { pending: boolean; error: boolean }) => void;
   onChange: (value: FormValue | undefined) => void;
 }
 
-function FieldControl({ field, idPrefix = "", value, error, uploadUrl, hosted, onChange }: FieldControlProps) {
+function FieldControl({ field, idPrefix = "", value, error, uploadUrl, hosted, disabled, onUploadStateChange, onChange }: FieldControlProps) {
   const id = `${idPrefix}field-${field.id}`;
+  const errorId = `${id}-error`;
+  const descriptionId = field.description ? `${id}-description` : undefined;
+  const describedBy = [descriptionId, error ? errorId : undefined].filter(Boolean).join(" ") || undefined;
   return (
     <div className="grid gap-2" data-field={field.id}>
       <Label htmlFor={id}>
@@ -272,13 +330,16 @@ function FieldControl({ field, idPrefix = "", value, error, uploadUrl, hosted, o
           id={id}
           uploadUrl={uploadUrl}
           hosted={hosted}
+          disabled={disabled}
+          describedBy={describedBy}
+          onUploadStateChange={onUploadStateChange}
           value={value as UploadedFileValue | UploadedFileValue[] | File | File[] | undefined}
           error={error}
           onChange={onChange}
         />
       ) : null}
       {field.type === "textarea" ? (
-        <Textarea id={id} placeholder={field.placeholder} value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)} aria-invalid={Boolean(error)} aria-required={field.required} />
+        <Textarea id={id} placeholder={field.placeholder} value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)} disabled={disabled} aria-invalid={Boolean(error)} aria-required={field.required} aria-describedby={describedBy} />
       ) : null}
       {field.type === "select" ? (
         <Select
@@ -286,7 +347,7 @@ function FieldControl({ field, idPrefix = "", value, error, uploadUrl, hosted, o
           value={typeof value === "string" ? value : undefined}
           onValueChange={(next) => { if (next) onChange(next); }}
         >
-          <SelectTrigger id={id} aria-invalid={Boolean(error)} aria-required={field.required}>
+          <SelectTrigger id={id} disabled={disabled} aria-invalid={Boolean(error)} aria-required={field.required} aria-describedby={describedBy}>
             <SelectValue placeholder={field.placeholder ?? "Select"} />
           </SelectTrigger>
           <SelectContent>
@@ -299,7 +360,7 @@ function FieldControl({ field, idPrefix = "", value, error, uploadUrl, hosted, o
         </Select>
       ) : null}
       {field.type === "radio" ? (
-        <RadioGroup value={typeof value === "string" ? value : undefined} onValueChange={onChange}>
+        <RadioGroup value={typeof value === "string" ? value : undefined} onValueChange={onChange} disabled={disabled} aria-invalid={Boolean(error)} aria-required={field.required} aria-describedby={describedBy}>
           {field.options?.map((option) => (
             <div key={option.value} className="flex items-center gap-2">
               <RadioGroupItem id={`${id}-${option.value}`} value={option.value} />
@@ -309,7 +370,7 @@ function FieldControl({ field, idPrefix = "", value, error, uploadUrl, hosted, o
         </RadioGroup>
       ) : null}
       {field.type === "checkbox" ? (
-        <Checkbox id={id} checked={value === true} onCheckedChange={(checked) => onChange(checked === true)} aria-invalid={Boolean(error)} aria-required={field.required} />
+        <Checkbox id={id} checked={value === true} disabled={disabled} onCheckedChange={(checked) => onChange(checked === true)} aria-invalid={Boolean(error)} aria-required={field.required} aria-describedby={describedBy} />
       ) : null}
       {field.type === "date" ? (
         <DatePicker
@@ -318,6 +379,8 @@ function FieldControl({ field, idPrefix = "", value, error, uploadUrl, hosted, o
           placeholder={field.placeholder ?? "Pick a date"}
           aria-invalid={Boolean(error)}
           aria-required={field.required}
+          aria-describedby={describedBy}
+          disabled={disabled}
           onChange={(next) => onChange(next)}
         />
       ) : null}
@@ -329,11 +392,13 @@ function FieldControl({ field, idPrefix = "", value, error, uploadUrl, hosted, o
           value={typeof value === "number" ? (Number.isFinite(value) ? value : "") : value === undefined ? "" : String(value)}
           aria-invalid={Boolean(error)}
           aria-required={field.required}
+          aria-describedby={describedBy}
+          disabled={disabled}
           onChange={(event) => onChange(field.type === "number" ? parseNumberInput(event.target.value) : event.target.value)}
         />
       ) : null}
-      {field.description ? <p className="text-sm text-muted-foreground">{field.description}</p> : null}
-      {field.type !== "file" && error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {field.description ? <p id={descriptionId} className="text-sm text-muted-foreground">{field.description}</p> : null}
+      {field.type !== "file" && error ? <p id={errorId} role="alert" className="text-sm text-destructive">{error}</p> : null}
     </div>
   );
 }

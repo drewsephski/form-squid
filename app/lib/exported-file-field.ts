@@ -11,24 +11,37 @@ function FileField({
   field,
   value,
   onChange,
+  onUploadStateChange,
+  disabled,
 }: {
   field: (typeof spec.steps)[number]["fields"][number];
   value?: unknown;
   onChange: (value: unknown) => void;
+  onUploadStateChange: (fieldId: string, state: { pending: boolean; error: boolean }) => void;
+  disabled: boolean;
 }) {
+  const [error, setError] = useState("");
   const maxFiles = field.maxFiles === 5 ? 5 : 1;
   const accept = Array.isArray(field.accept) && field.accept.length > 0 ? field.accept.join(",") : undefined;
   const files = Array.isArray(value) ? value : value ? [value] : [];
 
   function handleChange(list: FileList | null) {
-    if (!list || list.length === 0) return;
-    const selected = Array.from(list).slice(0, maxFiles);
+    if (disabled || !list || list.length === 0) return;
+    if (list.length > maxFiles) {
+      const message = maxFiles === 1 ? "Choose one file." : "Choose up to " + maxFiles + " files.";
+      setError(message);
+      onUploadStateChange(field.id, { pending: false, error: true });
+      return;
+    }
+    setError("");
+    onUploadStateChange(field.id, { pending: false, error: false });
+    const selected = Array.from(list);
     onChange(maxFiles === 1 ? selected[0] : selected);
   }
 
   return (
     <div className="space-y-2">
-      <Input type="file" accept={accept} multiple={maxFiles > 1} onChange={(event) => handleChange(event.target.files)} />
+      <Input id={"field-" + field.id} type="file" accept={accept} multiple={maxFiles > 1} disabled={disabled} aria-invalid={Boolean(error)} aria-describedby={error ? field.id + "-upload-error" : undefined} onChange={(event) => { handleChange(event.target.files); event.target.value = ""; }} />
       {files.map((file: { name: string; size: number }, index: number) => (
         <div key={index} className="flex items-center justify-between gap-2 text-sm">
           <span className="truncate">{file.name} · {formatBytes(file.size)}</span>
@@ -36,8 +49,11 @@ function FileField({
             type="button"
             variant="ghost"
             size="sm"
+            disabled={disabled}
             onClick={() => {
               const next = files.filter((_: unknown, itemIndex: number) => itemIndex !== index);
+              setError("");
+              onUploadStateChange(field.id, { pending: false, error: false });
               onChange(next.length === 0 ? undefined : maxFiles === 1 ? next[0] : next);
             }}
           >
@@ -45,6 +61,8 @@ function FileField({
           </Button>
         </div>
       ))}
+      {error ? <Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={() => { onChange(undefined); setError(""); onUploadStateChange(field.id, { pending: false, error: false }); }}>Clear file selection</Button> : null}
+      {error ? <p id={field.id + "-upload-error"} role="alert" className="text-sm text-destructive">{error}</p> : null}
       <p className="text-xs text-muted-foreground">Files are passed to onSubmit as browser File objects. FormSquid does not upload them in callback mode.</p>
     </div>
   );
@@ -77,10 +95,14 @@ function FileField({
   field,
   value,
   onChange,
+  onUploadStateChange,
+  disabled,
 }: {
   field: (typeof spec.steps)[number]["fields"][number];
   value?: unknown;
   onChange: (value: unknown) => void;
+  onUploadStateChange: (fieldId: string, state: { pending: boolean; error: boolean }) => void;
+  disabled: boolean;
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -89,9 +111,16 @@ function FileField({
   const files = Array.isArray(value) ? value : value ? [value] : [];
 
   async function handleChange(list: FileList | null) {
-    if (!list || list.length === 0) return;
+    if (disabled || pending || !list || list.length === 0) return;
     setError("");
-    const selected = Array.from(list).slice(0, maxFiles);
+    if (list.length > maxFiles) {
+      const message = maxFiles === 1 ? "Choose one file." : "Choose up to " + maxFiles + " files.";
+      setError(message);
+      onUploadStateChange(field.id, { pending: false, error: true });
+      return;
+    }
+    const selected = Array.from(list);
+    onUploadStateChange(field.id, { pending: true, error: false });
     setPending(true);
     try {
       const uploaded = [];
@@ -126,9 +155,11 @@ function FileField({
         }
         uploaded.push({ uploadId: body.uploadId, name: file.name, size: file.size, contentType: file.type || "application/octet-stream" });
       }
+      onUploadStateChange(field.id, { pending: false, error: false });
       onChange(maxFiles === 1 ? uploaded[0] : uploaded);
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Upload failed.");
+      onUploadStateChange(field.id, { pending: false, error: true });
     } finally {
       setPending(false);
     }
@@ -136,8 +167,8 @@ function FileField({
 
   return (
     <div className="space-y-2">
-      <Input type="file" accept={accept} multiple={maxFiles > 1} disabled={pending} onChange={(event) => void handleChange(event.target.files)} />
-      {pending ? <p className="text-sm text-muted-foreground">Uploading…</p> : null}
+      <Input id={"field-" + field.id} type="file" accept={accept} multiple={maxFiles > 1} disabled={disabled || pending} aria-invalid={Boolean(error)} aria-describedby={error ? field.id + "-upload-error" : pending ? field.id + "-upload-status" : undefined} onChange={(event) => { void handleChange(event.target.files); event.target.value = ""; }} />
+      {pending ? <p id={field.id + "-upload-status"} role="status" className="text-sm text-muted-foreground">Uploading…</p> : null}
       {files.map((file: { name: string; size: number }, index: number) => (
         <div key={index} className="flex items-center justify-between gap-2 text-sm">
           <span className="truncate">{file.name} · {formatBytes(file.size)}</span>
@@ -145,8 +176,11 @@ function FileField({
             type="button"
             variant="ghost"
             size="sm"
+            disabled={disabled || pending}
             onClick={() => {
               const next = files.filter((_: unknown, itemIndex: number) => itemIndex !== index);
+              setError("");
+              onUploadStateChange(field.id, { pending: false, error: false });
               onChange(next.length === 0 ? undefined : maxFiles === 1 ? next[0] : next);
             }}
           >
@@ -154,7 +188,8 @@ function FileField({
           </Button>
         </div>
       ))}
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {error ? <Button type="button" variant="ghost" size="sm" disabled={disabled || pending} onClick={() => { onChange(undefined); setError(""); onUploadStateChange(field.id, { pending: false, error: false }); }}>Clear file selection</Button> : null}
+      {error ? <p id={field.id + "-upload-error"} role="alert" className="text-sm text-destructive">{error}</p> : null}
     </div>
   );
 }

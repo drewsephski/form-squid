@@ -3,22 +3,13 @@
 import { and, count, desc, eq, inArray, lt, or } from "drizzle-orm";
 import { db } from "@/db";
 import { formVersions, formWebhooks, forms, submissions } from "@/db/schema";
-import { csvFileCell } from "@/app/lib/submission-display";
 import { formSpecSchema } from "@/app/lib/definitions";
-import { isSubmissionFileRef } from "@/app/lib/file-field";
 import { hostedHost } from "@/app/lib/origin";
 import { requireFormOwner, requireUser } from "@/app/lib/auth-guards";
 import { listRecentDeliveries } from "@/server/webhooks/deliver";
 import { maskWebhookSecret } from "@/server/webhooks/sign";
 
 const pageSize = 50;
-
-export type SubmissionRow = {
-  id: string;
-  formVersionId: string;
-  payload: unknown;
-  createdAt: string;
-};
 
 function encodeCursor(createdAt: Date, id: string) {
   return `${createdAt.toISOString()}\t${id}`;
@@ -115,6 +106,7 @@ export async function getForm(formId: string) {
 
   return {
     id: form.id,
+    ownerId: user.id,
     slug: form.slug,
     draftSlug: form.draftSlug,
     notifyEmail: form.notifyEmail ?? "",
@@ -162,34 +154,4 @@ export async function loadSubmissions(formId: string, cursor: string) {
   const user = await requireUser();
   await requireFormOwner(formId, user.id);
   return pageSubmissions(formId, cursor);
-}
-
-function csvCell(value: unknown) {
-  if (isSubmissionFileRef(value) || (Array.isArray(value) && value.some(isSubmissionFileRef))) {
-    return `"${csvFileCell(value).replaceAll('"', '""')}"`;
-  }
-  const text = value === undefined || value === null ? "" : typeof value === "string" ? value : JSON.stringify(value);
-  return `"${text.replaceAll('"', '""')}"`;
-}
-
-export async function exportSubmissionsCsv(formId: string) {
-  const user = await requireUser();
-  await requireFormOwner(formId, user.id);
-  const rows: SubmissionRow[] = [];
-  let cursor: string | null = null;
-  do {
-    const page = await pageSubmissions(formId, cursor ?? undefined);
-    rows.push(...page.submissions);
-    cursor = page.nextCursor;
-  } while (cursor);
-
-  const keys = [...new Set(rows.flatMap((row) => Object.keys((row.payload as Record<string, unknown>) ?? {})))];
-  const header = ["submitted", ...keys].map((key) => csvCell(key)).join(",");
-  const body = rows
-    .map((row) => {
-      const payload = (row.payload as Record<string, unknown>) ?? {};
-      return [csvCell(row.createdAt), ...keys.map((key) => csvCell(payload[key]))].join(",");
-    })
-    .join("\n");
-  return [header, body].filter(Boolean).join("\n");
 }

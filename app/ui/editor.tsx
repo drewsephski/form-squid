@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -13,12 +13,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { generateAction } from "@/app/lib/actions/generate";
-import { exportSubmissionsCsv, loadSubmissions } from "@/app/lib/actions/forms-read";
+import { loadSubmissions } from "@/app/lib/actions/forms-read";
 import { createSubmissionFileDownload } from "@/app/lib/actions/files";
 import { publishForm, restoreVersion, updateDraft, updateNotifyEmail } from "@/app/lib/actions/forms-write";
 import { trackFunnel } from "@/app/lib/analytics";
@@ -27,6 +27,7 @@ import { compileAction } from "@/app/lib/actions/compile";
 import { describeSpecChange } from "@/app/lib/diff-spec";
 import { type FormSpec } from "@/app/lib/definitions";
 import { specIssue, specsMatch } from "@/app/lib/edit-spec";
+import { clearEditorRecovery, editorRecoveryKey, parseEditorRecovery, readEditorRecovery, storeEditorRecovery, subscribeEditorRecovery } from "@/app/lib/editor-recovery";
 import { formatFileSize } from "@/app/lib/file-field";
 import { deriveLaunchState, type LaunchTab } from "@/app/lib/launch-steps";
 import { appOrigin, hostedHost, hostedUrl } from "@/app/lib/origin";
@@ -42,6 +43,7 @@ import { LaunchChecklist } from "@/app/ui/launch-checklist";
 
 interface EditorForm {
   id: string;
+  ownerId: string;
   slug: string;
   draftSlug: string;
   notifyEmail: string;
@@ -97,6 +99,11 @@ export function Editor({ form }: { form: EditorForm }) {
   const [publishedAt, setPublishedAt] = useState(form.publishedAt);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [retrySave, setRetrySave] = useState(0);
+  const [recoveryFailed, setRecoveryFailed] = useState(false);
+  const recoveryKey = editorRecoveryKey(form.ownerId, form.id);
+  const recoverySnapshot = useSyncExternalStore(subscribeEditorRecovery, () => readEditorRecovery(recoveryKey), () => null);
+  const recovery = useMemo(() => parseEditorRecovery(recoverySnapshot), [recoverySnapshot]);
   const [selectedFieldId, setSelectedFieldId] = useState("");
   const [notifyEmail, setNotifyEmail] = useState(form.notifyEmail);
   const [savedNotifyEmail, setSavedNotifyEmail] = useState(form.notifyEmail);
@@ -109,7 +116,6 @@ export function Editor({ form }: { form: EditorForm }) {
   const [removedIds, setRemovedIds] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [exportingCsv, setExportingCsv] = useState(false);
   const [savingEmail, setSavingEmail] = useState(false);
   const [deletingSubmission, setDeletingSubmission] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -127,11 +133,41 @@ export function Editor({ form }: { form: EditorForm }) {
   const lowerTabsRef = useRef<HTMLDivElement>(null);
   const notifyEmailRef = useRef<HTMLElement>(null);
   const focusNotifyAfterTab = useRef(false);
+  const immediateSave = useRef(false);
 
   const draftIssue = specIssue(spec);
   const dirty = !specsMatch(spec, savedSpec) || slug !== savedSlug;
   const showSaving = dirty && saving;
   const showSaveError = dirty ? saveError : "";
+  const recoverable = !dirty && recovery && (!specsMatch(recovery.spec, savedSpec) || recovery.slug !== savedSlug) ? recovery : null;
+
+  function changeSpec(next: FormSpec) {
+    setRecoveryFailed(!storeEditorRecovery(recoveryKey, next, slug, savedSpec, savedSlug));
+    setSpec(next);
+  }
+
+  function changeSlug(next: string) {
+    setRecoveryFailed(!storeEditorRecovery(recoveryKey, spec, next, savedSpec, savedSlug));
+    setSlug(next);
+  }
+
+  function restoreRecovery() {
+    if (!recoverable) return;
+    setSpec(recoverable.spec);
+    setSlug(recoverable.slug);
+    setSaveError("");
+    setRetrySave((current) => current + 1);
+  }
+
+  useEffect(() => {
+    if (!dirty) return;
+    function beforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, [dirty]);
 
   useEffect(() => {
     if (serverSubmissions.current === form.submissions) {
@@ -144,11 +180,13 @@ export function Editor({ form }: { form: EditorForm }) {
   }, [form.submissions, form.nextCursor]);
 
   useEffect(() => {
-    if (!dirty || draftIssue) {
+    if (pending || !dirty || draftIssue) {
       return;
     }
     const seq = saveSeq.current + 1;
     saveSeq.current = seq;
+    const delay = immediateSave.current ? 0 : 1000;
+    immediateSave.current = false;
     const timer = window.setTimeout(() => {
       const job = writeQueue.current.catch(() => undefined).then(async () => {
         if (saveSeq.current !== seq) {
@@ -157,11 +195,11 @@ export function Editor({ form }: { form: EditorForm }) {
         setSaving(true);
         try {
           await updateDraft(form.id, spec, slug);
-          if (saveSeq.current !== seq) {
-            return;
-          }
+          // A completed write is the actual server baseline, even when the
+          // user edited again during it. This keeps the latest edits dirty.
           setSavedSpec(spec);
           setSavedSlug(slug);
+          clearEditorRecovery(recoveryKey, { spec, slug });
           setSaving(false);
           setSaveError("");
         } catch (error: unknown) {
@@ -173,9 +211,9 @@ export function Editor({ form }: { form: EditorForm }) {
         }
       });
       writeQueue.current = job;
-    }, 1000);
+    }, delay);
     return () => window.clearTimeout(timer);
-  }, [dirty, draftIssue, form.id, slug, spec]);
+  }, [dirty, draftIssue, form.id, pending, recoveryKey, retrySave, savedSlug, savedSpec, slug, spec]);
 
   const submissions = [...form.submissions, ...extraSubmissions].filter((row) => !removedIds.includes(row.id));
   const visibleSubmissions = submissions.filter((row) => {
@@ -258,6 +296,7 @@ export function Editor({ form }: { form: EditorForm }) {
       saveSeq.current += 1;
       setSavedSpec(nextSpec);
       setSavedSlug(nextSlug);
+      clearEditorRecovery(recoveryKey, { spec: nextSpec, slug: nextSlug });
       setPublishedSlug(nextSlug);
       setPublishedSpec(nextSpec);
       setPublishedAt(new Date().toISOString());
@@ -335,28 +374,6 @@ export function Editor({ form }: { form: EditorForm }) {
     }
   }
 
-  async function handleExportCsv() {
-    if (exportingCsv) {
-      return;
-    }
-    setExportingCsv(true);
-    try {
-      const csv = await exportSubmissionsCsv(form.id);
-      const blob = new Blob([csv], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${sourceSlug}.csv`;
-      link.click();
-      URL.revokeObjectURL(url);
-      toast.success("CSV downloaded");
-    } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Could not export submissions.");
-    } finally {
-      setExportingCsv(false);
-    }
-  }
-
   async function handleDeleteSubmission() {
     if (!selected || deletingSubmission) {
       return;
@@ -396,9 +413,13 @@ export function Editor({ form }: { form: EditorForm }) {
 
   async function handleRestore(versionId: string, versionNumber: number) {
     setPending(true);
+    saveSeq.current += 1;
     try {
+      await writeQueue.current.catch(() => undefined);
       const next = await restoreVersion(form.id, versionId);
       setSpec(next);
+      setSavedSpec(next);
+      clearEditorRecovery(recoveryKey);
       setPreviewVersionId("");
       toast.success(`Restored version ${versionNumber}`);
     } catch (error: unknown) {
@@ -465,6 +486,26 @@ export function Editor({ form }: { form: EditorForm }) {
         </p>
       </header>
 
+      {recoverable ? (
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4" aria-label="Recover editor changes">
+          <div className="space-y-1">
+            <p className="text-sm font-medium">Unsaved edits found on this device</p>
+            <p className="text-sm text-muted-foreground">
+              {recoverable.baseSpec !== JSON.stringify(savedSpec) || recoverable.baseSlug !== savedSlug
+                ? "The saved draft has changed since these edits. Restore them to review before publishing."
+                : "Restore your edits to continue where you left off."}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" disabled={pending} onClick={() => clearEditorRecovery(recoveryKey)}>Discard edits</Button>
+            <Button type="button" disabled={pending} onClick={restoreRecovery}>Restore edits</Button>
+          </div>
+        </section>
+      ) : null}
+      {dirty && recoveryFailed ? (
+        <p role="alert" className="text-sm text-destructive">Device backup is unavailable. Keep this page open until your changes are saved.</p>
+      ) : null}
+
       <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="min-w-0 space-y-3">
           <div className="flex gap-2" role="group" aria-label="Preview size">
@@ -483,43 +524,45 @@ export function Editor({ form }: { form: EditorForm }) {
             </AnimateHeight>
           </div>
         </div>
-        <Tabs defaultValue="ai" className="min-w-0">
-          <TabsList className="flex h-auto flex-wrap">
-            <TabsTrigger value="ai">AI</TabsTrigger>
-            <TabsTrigger value="fields">Fields</TabsTrigger>
-            <TabsTrigger value="form">Form</TabsTrigger>
-            <TabsTrigger value="appearance">Appearance</TabsTrigger>
-          </TabsList>
-          <TabsContent value="ai" className="min-w-0 space-y-3">
-            <Textarea aria-label="Edit instruction" value={instruction} onChange={(event) => setInstruction(event.target.value)} placeholder="Split this into two steps." />
-            <Button type="button" onClick={() => void handleEdit()} disabled={pending}>Ask FormSquid</Button>
-            <AnimateHeight>
-              {candidate ? (
-                <div className="space-y-2 rounded-lg border p-3 text-sm">
-                  {describeSpecChange(spec, candidate).map((line) => (
-                    <p key={line}>{line}</p>
-                  ))}
-                  <Button type="button" onClick={() => { setSpec(candidate); setCandidate(null); }}>Apply</Button>
-                </div>
-              ) : null}
-            </AnimateHeight>
-          </TabsContent>
-          <TabsContent value="fields" className="min-w-0">
-            <AnimateHeight>
-              <FieldsInspector spec={spec} slug={slug} selectedId={selectedFieldId} onSpec={setSpec} onSlug={setSlug} onSelect={setSelectedFieldId} />
-            </AnimateHeight>
-          </TabsContent>
-          <TabsContent value="form" className="min-w-0">
-            <AnimateHeight>
-              <FormSettings spec={spec} slug={slug} selectedId={selectedFieldId} onSpec={setSpec} onSlug={setSlug} onSelect={setSelectedFieldId} />
-            </AnimateHeight>
-          </TabsContent>
-          <TabsContent value="appearance" className="min-w-0">
-            <AnimateHeight>
-              <AppearanceSettings spec={spec} onSpec={setSpec} />
-            </AnimateHeight>
-          </TabsContent>
-        </Tabs>
+        <fieldset disabled={pending} className="min-w-0">
+          <Tabs defaultValue="ai" className="min-w-0">
+            <TabsList className="flex h-auto flex-wrap">
+              <TabsTrigger value="ai">AI</TabsTrigger>
+              <TabsTrigger value="fields">Fields</TabsTrigger>
+              <TabsTrigger value="form">Form</TabsTrigger>
+              <TabsTrigger value="appearance">Appearance</TabsTrigger>
+            </TabsList>
+            <TabsContent value="ai" className="min-w-0 space-y-3">
+              <Textarea aria-label="Edit instruction" value={instruction} onChange={(event) => setInstruction(event.target.value)} placeholder="Split this into two steps." />
+              <Button type="button" onClick={() => void handleEdit()} disabled={pending}>Ask FormSquid</Button>
+              <AnimateHeight>
+                {candidate ? (
+                  <div className="space-y-2 rounded-lg border p-3 text-sm">
+                    {describeSpecChange(spec, candidate).map((line) => (
+                      <p key={line}>{line}</p>
+                    ))}
+                    <Button type="button" onClick={() => { changeSpec(candidate); setCandidate(null); }}>Apply</Button>
+                  </div>
+                ) : null}
+              </AnimateHeight>
+            </TabsContent>
+            <TabsContent value="fields" className="min-w-0">
+              <AnimateHeight>
+                <FieldsInspector spec={spec} slug={slug} selectedId={selectedFieldId} onSpec={changeSpec} onSlug={changeSlug} onSelect={setSelectedFieldId} />
+              </AnimateHeight>
+            </TabsContent>
+            <TabsContent value="form" className="min-w-0">
+              <AnimateHeight>
+                <FormSettings spec={spec} slug={slug} selectedId={selectedFieldId} onSpec={changeSpec} onSlug={changeSlug} onSelect={setSelectedFieldId} />
+              </AnimateHeight>
+            </TabsContent>
+            <TabsContent value="appearance" className="min-w-0">
+              <AnimateHeight>
+                <AppearanceSettings spec={spec} onSpec={changeSpec} />
+              </AnimateHeight>
+            </TabsContent>
+          </Tabs>
+        </fieldset>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -544,6 +587,11 @@ export function Editor({ form }: { form: EditorForm }) {
           <p className="text-sm text-muted-foreground" aria-live="polite">{status}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {dirty ? (
+            <Button type="button" variant="outline" disabled={saving || pending || Boolean(draftIssue)} onClick={() => { immediateSave.current = true; setRetrySave((current) => current + 1); }}>
+              {showSaveError ? "Retry save" : "Save now"}
+            </Button>
+          ) : null}
           {published ? (
             <Button type="button" variant="outline" onClick={() => void handleCopyLink()}>
               Copy link
@@ -656,15 +704,13 @@ export function Editor({ form }: { form: EditorForm }) {
                       <p className="text-sm text-muted-foreground">{formatResponseTime(selected.createdAt)}</p>
                     </div>
                     <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={exportingCsv}
-                        onClick={() => void handleExportCsv()}
+                      <a
+                        href={`/api/forms/${encodeURIComponent(form.id)}/submissions/export`}
+                        download={`${publishedSlug}.csv`}
+                        className={buttonVariants({ variant: "outline", size: "sm" })}
                       >
-                        {exportingCsv ? "Downloading…" : "Download CSV"}
-                      </Button>
+                        Download CSV
+                      </a>
                       <Button
                         type="button"
                         variant="outline"

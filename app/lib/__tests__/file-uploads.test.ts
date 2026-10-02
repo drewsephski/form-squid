@@ -1,4 +1,5 @@
 import { describe, expect, test } from "@jest/globals";
+import ts from "typescript";
 import { compileForm } from "../compiler";
 import { formSpecSchema } from "../definitions";
 import { mimeAllowed, sanitizeDisplayFilename } from "../file-field";
@@ -45,6 +46,38 @@ const resume = formSpecSchema.parse({
     },
   ],
 });
+
+function loadGeneratedSchema(source: string) {
+  const output = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2022,
+      esModuleInterop: true,
+    },
+    fileName: "schema.ts",
+  });
+  const compiledModule = { exports: {} as Record<string, unknown> };
+  const run = new Function("exports", "require", "module", output.outputText);
+  run(compiledModule.exports, require, compiledModule);
+  return compiledModule.exports as {
+    submissionSchema: {
+      safeParse: (input: unknown) => { success: boolean; data?: Record<string, unknown> };
+    };
+    stepSchemas: Record<string, {
+      safeParse: (input: unknown) => { success: boolean; data?: Record<string, unknown> };
+    }>;
+  };
+}
+
+function expectGeneratedSchemaParity(spec: ReturnType<typeof formSpecSchema.parse>, payload: unknown) {
+  const runtime = validateSubmission(spec, payload);
+  const generated = compileForm(spec, { submission: "callback" }).schemaSource;
+  const parsed = loadGeneratedSchema(generated).submissionSchema.safeParse(payload);
+  expect(parsed.success).toBe(runtime.ok);
+  if (runtime.ok && parsed.success) {
+    expect(parsed.data).toEqual(runtime.data);
+  }
+}
 
 describe("file field FormSpec", () => {
   test("parses file fields on schema version 1", () => {
@@ -114,6 +147,99 @@ describe("file submission validation", () => {
   });
 });
 
+describe("generated schema file validation parity", () => {
+  const uploadId = "11111111-1111-4111-8111-111111111111";
+
+  test("accepts required hosted upload ids and matches normalized submission data", () => {
+    expectGeneratedSchemaParity(resume, {
+      name: "Drew",
+      resume: uploadId,
+      need_attachments: true,
+      attachments: [uploadId, "22222222-2222-4222-8222-222222222222"],
+    });
+  });
+
+  test("accepts an absent optional file and callback File-like values", () => {
+    const optionalFile = formSpecSchema.parse({
+      schemaVersion: 1,
+      title: "Optional upload",
+      submitLabel: "Send",
+      successMessage: "Sent",
+      steps: [{ id: "main", title: "Details", fields: [{ id: "attachment", type: "file", label: "Attachment", required: false }] }],
+    });
+    expectGeneratedSchemaParity(optionalFile, {});
+    expectGeneratedSchemaParity(resume, {
+      name: "Drew",
+      resume: { name: "drew.pdf", size: 400, type: "application/pdf" },
+      need_attachments: false,
+    });
+  });
+
+  test("rejects missing required files and oversized callback files", () => {
+    expectGeneratedSchemaParity(resume, { name: "Drew" });
+    expectGeneratedSchemaParity(resume, {
+      name: "Drew",
+      resume: { name: "huge.pdf", size: 20 * 1024 * 1024, type: "application/pdf" },
+      need_attachments: false,
+    });
+  });
+
+  test("ignores required files hidden by a conditional and requires them when visible", () => {
+    expectGeneratedSchemaParity(resume, {
+      name: "Drew",
+      resume: uploadId,
+      need_attachments: false,
+    });
+    expectGeneratedSchemaParity(resume, {
+      name: "Drew",
+      resume: uploadId,
+      need_attachments: true,
+    });
+  });
+
+  test("normalizes uploaded widget metadata before step and submission validation", () => {
+    const generated = loadGeneratedSchema(compileForm(resume, {
+      submission: "formsquid",
+      url: "https://api.formsquid.com/forms/apply/submissions",
+      uploadUrl: "https://api.formsquid.com/forms/apply/uploads",
+    }).schemaSource);
+    const resumeWidgetValue = {
+      uploadId,
+      name: "drew.pdf",
+      size: 1200,
+      contentType: "application/pdf",
+    };
+    const attachmentWidgetValues = [
+      { uploadId: "22222222-2222-4222-8222-222222222222", name: "one.pdf", size: 300, contentType: "application/pdf" },
+      { uploadId: "33333333-3333-4333-8333-333333333333", name: "two.pdf", size: 400, contentType: "application/pdf" },
+    ];
+    const payload = {
+      name: "Drew",
+      resume: resumeWidgetValue,
+      need_attachments: true,
+      attachments: attachmentWidgetValues,
+    };
+
+    const stepResult = generated.stepSchemas.main?.safeParse(payload);
+    const submissionResult = generated.submissionSchema.safeParse(payload);
+    expect(stepResult?.success).toBe(true);
+    expect(stepResult?.data?.resume).toBe(uploadId);
+    expect(stepResult?.data?.attachments).toEqual(attachmentWidgetValues.map((file) => file.uploadId));
+    expect(submissionResult.success).toBe(true);
+    expect(submissionResult.data?.resume).toBe(uploadId);
+    expect(submissionResult.data?.attachments).toEqual(attachmentWidgetValues.map((file) => file.uploadId));
+
+    const hidden = generated.submissionSchema.safeParse({
+      name: "Drew",
+      resume: resumeWidgetValue,
+      need_attachments: false,
+      attachments: attachmentWidgetValues,
+    });
+    expect(hidden.success).toBe(true);
+    expect(hidden.data?.attachments).toBeUndefined();
+  });
+});
+
 describe("file display and webhooks", () => {
   test("labels filenames without urls", () => {
     const answers = labeledAnswers(resume, {
@@ -173,6 +299,11 @@ describe("exported file field sources", () => {
     expect(compiled.formSource).toContain("browser File objects");
     expect(compiled.formSource).not.toContain("/uploads");
     expect(compiled.formSource).not.toContain("uploadId");
+    expect(compiled.formSource).toContain('"Choose up to " + maxFiles + " files."');
+    expect(compiled.formSource).not.toContain("slice(0, maxFiles)");
+    expect(compiled.formSource).toContain("onUploadStateChange(field.id, { pending: false, error: true })");
+    expect(compiled.formSource).toContain("Clear file selection");
+    expect(compiled.formSource).toContain("if (disabled || !list || list.length === 0) return;");
   });
 
   test("hosted registry source uses the upload API and opaque upload ids", () => {
@@ -184,5 +315,12 @@ describe("exported file field sources", () => {
     expect(compiled.formSource).toContain("https://api.formsquid.com/forms/apply/uploads");
     expect(compiled.formSource).toContain("uploadId");
     expect(compiled.formSource).toContain("serializeSubmission");
+    expect(compiled.formSource).toContain("pendingUploadCountRef.current > 0");
+    expect(compiled.formSource).toContain("uploadIssueCountRef.current > 0");
+    expect(compiled.formSource).toContain("if (sendingRef.current) return;");
+    expect(compiled.formSource).toContain("disabled={sending || pendingUploadCount > 0}");
+    expect(compiled.formSource).not.toContain("slice(0, maxFiles)");
+    expect(compiled.formSource).toContain("Clear file selection");
+    expect(compiled.formSource).toContain("if (disabled || pending || !list || list.length === 0) return;");
   });
 });

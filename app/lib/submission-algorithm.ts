@@ -262,7 +262,7 @@ export function validatePayload(
       continue;
     }
 
-    if (!Object.prototype.hasOwnProperty.call(data, field.id)) {
+    if (!Object.prototype.hasOwnProperty.call(data, field.id) || data[field.id] === undefined) {
       if (field.type === "checkbox" && !field.required) {
         normalized[field.id] = false;
         continue;

@@ -3,6 +3,7 @@ const config = {
   testEnvironment: "node",
   testMatch: ["**/__tests__/**/*.test.ts"],
   modulePathIgnorePatterns: ["<rootDir>/.tmp"],
+  moduleNameMapper: { "^@/(.*)$": "<rootDir>/$1" },
   transform: {
     "^.+\\.tsx?$": [
       "ts-jest",

@@ -12,21 +12,31 @@ export type CompiledForm = {
 };
 
 function embeddedAlgorithm(): string {
-  const source = readFileSync(
-    path.join(process.cwd(), "app/lib/submission-algorithm.ts"),
-    "utf8",
-  );
-  const javascript = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.ESNext,
-      target: ts.ScriptTarget.ES2022,
-    },
-  }).outputText;
+  const files = ["upload-limits.ts", "file-field.ts", "submission-algorithm.ts"];
 
-  return javascript
-    .replace(/^export /gm, "")
-    .replace(/^import .*$/gm, "")
-    .trim();
+  return files
+    .map((file) => {
+      const source = readFileSync(path.join(process.cwd(), "app/lib", file), "utf8");
+      const javascript = ts.transpileModule(source, {
+        compilerOptions: {
+          module: ts.ModuleKind.ESNext,
+          target: ts.ScriptTarget.ES2022,
+        },
+        fileName: file,
+      }).outputText;
+      const parsed = ts.createSourceFile(file, javascript, ts.ScriptTarget.ES2022, true, ts.ScriptKind.JS);
+      const imports = parsed.statements.filter(ts.isImportDeclaration).map((declaration) => ({
+        start: declaration.getStart(parsed),
+        end: declaration.end,
+      }));
+      let selfContained = javascript;
+      for (const declaration of imports.reverse()) {
+        selfContained = `${selfContained.slice(0, declaration.start)}${selfContained.slice(declaration.end)}`;
+      }
+
+      return selfContained.replace(/^export /gm, "").trim();
+    })
+    .join("\n\n");
 }
 
 function registryDependencies(): string[] {
@@ -46,9 +56,36 @@ const spec = ${specLiteral};
 
 ${embeddedAlgorithm()}
 
+function normalizeUploadedFileValues(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return value;
+  }
+  const record = { ...value };
+  const fileFields = spec.steps.flatMap((step) => step.fields).filter((field) => field.type === "file");
+  for (const field of fileFields) {
+    const current = record[field.id];
+    const isUploadedFileValue = (item) => Boolean(
+      item &&
+      typeof item === "object" &&
+      !Array.isArray(item) &&
+      isUploadId(item.uploadId) &&
+      typeof item.name === "string" &&
+      typeof item.size === "number" &&
+      Number.isFinite(item.size) &&
+      typeof item.contentType === "string",
+    );
+    if (isUploadedFileValue(current)) {
+      record[field.id] = current.uploadId;
+    } else if (Array.isArray(current) && current.every(isUploadedFileValue)) {
+      record[field.id] = current.map((item) => item.uploadId);
+    }
+  }
+  return record;
+}
+
 function createSchema(stepId) {
   return z.any().superRefine((value, context) => {
-    const result = validatePayload(spec, value, stepId);
+    const result = validatePayload(spec, normalizeUploadedFileValues(value), stepId);
     if (!result.ok) {
       for (const error of result.errors) {
         context.addIssue({
@@ -59,7 +96,7 @@ function createSchema(stepId) {
       }
     }
   }).transform((value) => {
-    const result = validatePayload(spec, value, stepId);
+    const result = validatePayload(spec, normalizeUploadedFileValues(value), stepId);
     return result.ok ? result.data : value;
   });
 }
@@ -92,12 +129,23 @@ function formSource(spec: FormSpec, target: CompileTarget): string {
   const honeypotState = hosted ? `  const [honeypot, setHoneypot] = useState("");\n` : "";
   const submitHandler = hosted
     ? `  async function handleSubmit(values: unknown) {
-    setSubmitError("");
-    if (honeypot) {
-      setDone(true);
+    if (sendingRef.current) return;
+    if (pendingUploadCountRef.current > 0) {
+      setSubmitError("Wait for the file upload to finish before submitting.");
       return;
     }
+    if (uploadIssueCountRef.current > 0) {
+      setSubmitError("Retry or remove the file with an upload error before submitting.");
+      return;
+    }
+    sendingRef.current = true;
+    setSending(true);
+    setSubmitError("");
     try {
+      if (honeypot) {
+        setDone(true);
+        return;
+      }
       const payload = serializeSubmission(values);
       const response = await fetch(submitUrl, {
         method: "POST",
@@ -113,9 +161,23 @@ function formSource(spec: FormSpec, target: CompileTarget): string {
       setSubmitError(message);
     } catch {
       setSubmitError("Could not submit. Try again.");
+    } finally {
+      sendingRef.current = false;
+      setSending(false);
     }
   }`
     : `  async function handleSubmit(values: unknown) {
+    if (sendingRef.current) return;
+    if (pendingUploadCountRef.current > 0) {
+      setSubmitError("Wait for the file upload to finish before submitting.");
+      return;
+    }
+    if (uploadIssueCountRef.current > 0) {
+      setSubmitError("Retry or remove the file with an upload error before submitting.");
+      return;
+    }
+    sendingRef.current = true;
+    setSending(true);
     setSubmitError("");
     try {
       await onSubmit(((values as Record<string, unknown>) ?? {}));
@@ -123,6 +185,9 @@ function formSource(spec: FormSpec, target: CompileTarget): string {
     } catch (error) {
       const message = error instanceof Error && error.message ? error.message : "Could not submit. Try again.";
       setSubmitError(message);
+    } finally {
+      sendingRef.current = false;
+      setSending(false);
     }
   }`;
   const fileFieldSource = exportedFileFieldSource(hosted);  const honeypotField = hosted
@@ -138,7 +203,7 @@ function formSource(spec: FormSpec, target: CompileTarget): string {
     : "";
   return `"use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
@@ -265,6 +330,13 @@ function DateField({
 ${componentSignature}
   const [stepIndex, setStepIndex] = useState(0);
   const [done, setDone] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [pendingUploadCount, setPendingUploadCount] = useState(0);
+  const [uploadIssueCount, setUploadIssueCount] = useState(0);
+  const pendingUploadCountRef = useRef(0);
+  const uploadIssueCountRef = useRef(0);
+  const uploadStates = useRef(new Map<string, { pending: boolean; error: boolean }>());
+  const sendingRef = useRef(false);
 ${honeypotState}  const [submitError, setSubmitError] = useState("");
   const form = useForm({
     resolver: zodResolver(submissionSchema),
@@ -276,7 +348,36 @@ ${honeypotState}  const [submitError, setSubmitError] = useState("");
     return null;
   }
 
+  function handleUploadStateChange(fieldId: string, state: { pending: boolean; error: boolean }) {
+    uploadStates.current.set(fieldId, state);
+    pendingUploadCountRef.current = [...uploadStates.current.values()].filter((upload) => upload.pending).length;
+    uploadIssueCountRef.current = [...uploadStates.current.values()].filter((upload) => upload.error).length;
+    setPendingUploadCount(pendingUploadCountRef.current);
+    setUploadIssueCount(uploadIssueCountRef.current);
+  }
+
+  function handleFieldChange(fieldId: string, value: unknown, onChange: (value: unknown) => void) {
+    if (sendingRef.current || pendingUploadCountRef.current > 0) return;
+    onChange(value);
+    const values = { ...(form.getValues() as Record<string, unknown>), [fieldId]: value };
+    for (const [uploadFieldId, state] of uploadStates.current) {
+      if (!state.error) continue;
+      const uploadField = spec.steps.flatMap((item) => item.fields).find((item) => item.id === uploadFieldId);
+      if (!uploadField || !conditionMet(spec, values, uploadField)) {
+        handleUploadStateChange(uploadFieldId, { pending: false, error: false });
+      }
+    }
+  }
+
   function handleNext() {
+    if (pendingUploadCountRef.current > 0) {
+      setSubmitError("Wait for the file upload to finish before continuing.");
+      return;
+    }
+    if (uploadIssueCountRef.current > 0) {
+      setSubmitError("Retry or remove the file with an upload error before continuing.");
+      return;
+    }
     const parsed = stepSchemas[step.id as keyof typeof stepSchemas].safeParse(form.getValues());
     if (!parsed.success) {
       for (const issue of parsed.error.issues) {
@@ -306,6 +407,7 @@ ${submitHandler}
           {spec.description ? <p className="text-muted-foreground">{spec.description}</p> : null}
         </div>
         <h2 className="text-lg font-medium">{step.title}</h2>
+        <fieldset disabled={sending || pendingUploadCount > 0} className="min-w-0 space-y-6 border-0 p-0">
         {step.fields.map((field) => {
           if (field.visibleWhen && !conditionMet(spec, watched ?? {}, field)) {
             return null;
@@ -318,7 +420,7 @@ ${submitHandler}
               render={({ field: control }) => (
                 <FormItem>
                   <FormLabel>{field.label}</FormLabel>
-                  <FormControl>{renderControl(field, control)}</FormControl>
+                  <FormControl>{renderControl(field, { value: control.value, onChange: (value) => handleFieldChange(field.id, value, control.onChange) }, handleUploadStateChange, sending || pendingUploadCount > 0)}</FormControl>
                   {field.description ? <FormDescription>{field.description}</FormDescription> : null}
                   <FormMessage />
                 </FormItem>
@@ -326,19 +428,20 @@ ${submitHandler}
             />
           );
         })}
+        </fieldset>
 ${honeypotField}        <div className="flex gap-2">
           {stepIndex > 0 ? (
-            <Button type="button" variant="outline" className="shrink-0" onClick={() => setStepIndex((current: number) => current - 1)}>
+              <Button type="button" variant="outline" className="shrink-0" disabled={sending || pendingUploadCount > 0 || uploadIssueCount > 0} onClick={() => setStepIndex((current: number) => current - 1)}>
               Back
             </Button>
           ) : null}
           <div className={submitSlotClassName}>
             {stepIndex < spec.steps.length - 1 ? (
-              <Button type="button" className={submitClassName} onClick={handleNext}>
-                Next
-              </Button>
-            ) : (
-              <Button type="submit" className={submitClassName}>{spec.submitLabel}</Button>
+            <Button type="button" className={submitClassName} disabled={sending || pendingUploadCount > 0 || uploadIssueCount > 0} onClick={handleNext}>
+              {pendingUploadCount > 0 ? "Uploading…" : uploadIssueCount > 0 ? "Fix file upload" : "Next"}
+            </Button>
+          ) : (
+            <Button type="submit" className={submitClassName} disabled={sending || pendingUploadCount > 0 || uploadIssueCount > 0}>{sending ? "Sending…" : pendingUploadCount > 0 ? "Uploading…" : uploadIssueCount > 0 ? "Fix file upload" : spec.submitLabel}</Button>
             )}
           </div>
         </div>
@@ -369,9 +472,9 @@ function conditionMet(formSpec: typeof spec, values: Record<string, unknown>, fi
 
 ${fileFieldSource}
 
-function renderControl(field: (typeof spec.steps)[number]["fields"][number], control: { value?: unknown; onChange: (value: unknown) => void }) {
+function renderControl(field: (typeof spec.steps)[number]["fields"][number], control: { value?: unknown; onChange: (value: unknown) => void }, onUploadStateChange: (fieldId: string, state: { pending: boolean; error: boolean }) => void, disabled: boolean) {
   if (field.type === "file") {
-    return <FileField field={field} value={control.value} onChange={control.onChange} />;
+    return <FileField field={field} value={control.value} onChange={control.onChange} onUploadStateChange={onUploadStateChange} disabled={disabled} />;
   }
   if (field.type === "textarea") {
     return <Textarea placeholder={field.placeholder} value={String(control.value ?? "")} onChange={(event) => control.onChange(event.target.value)} />;
