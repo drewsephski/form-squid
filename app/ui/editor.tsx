@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -40,6 +39,7 @@ import { FieldsInspector, FormSettings } from "@/app/ui/editor-inspector";
 import { FormView } from "@/app/ui/form-view";
 import { IntegrationsPanel, type WebhookPanelState } from "@/app/ui/integrations-panel";
 import { LaunchChecklist } from "@/app/ui/launch-checklist";
+import { MyFormsLink } from "@/app/ui/my-forms-link";
 
 interface EditorForm {
   id: string;
@@ -466,14 +466,9 @@ export function Editor({ form }: { form: EditorForm }) {
   return (
     <div className="grid min-w-0 gap-8">
       <header className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <Link
-          href="/forms"
-          className="text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          ← My forms
-        </Link>
+        <MyFormsLink />
         <div className="min-w-0 flex-1 basis-full sm:basis-auto">
-          <h1 className="truncate font-heading text-xl font-medium tracking-tight sm:text-2xl">
+          <h1 className="font-heading text-xl font-medium tracking-tight [overflow-wrap:anywhere] sm:text-2xl">
             {spec.title || "Untitled form"}
           </h1>
         </div>
