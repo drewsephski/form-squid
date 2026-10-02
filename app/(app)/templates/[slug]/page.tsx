@@ -44,10 +44,16 @@ export default async function TemplatePage({ params }: { params: Promise<{ slug:
           <h1 className="font-heading text-4xl font-medium tracking-tight">{template.name}</h1>
           <p className="max-w-xl text-muted-foreground">{template.description}</p>
         </div>
-        <div className="rounded-xl border bg-muted/30 p-6">
-          <FormView spec={template.spec} preview />
-        </div>
         <UseTemplateButton spec={template.spec} page={`/templates/${template.slug}`} templateSlug={template.slug} />
+        <section className="space-y-3" aria-labelledby="template-preview-heading">
+          <div className="space-y-1">
+            <h2 id="template-preview-heading" className="text-sm font-medium">Try the preview</h2>
+            <p className="text-sm text-muted-foreground">Explore the fields and steps. Preview responses are not saved.</p>
+          </div>
+          <div className="rounded-xl border bg-muted/30 p-6">
+            <FormView spec={template.spec} preview />
+          </div>
+        </section>
       </div>
       <aside className="space-y-4">
         <h2 className="text-sm font-medium">Fields</h2>
