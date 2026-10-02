@@ -12,10 +12,9 @@ export type CompiledForm = {
 };
 
 function embeddedAlgorithm(): string {
-  const source = readFileSync(
-    path.join(process.cwd(), "app/lib/submission-algorithm.ts"),
-    "utf8",
-  );
+  const source = ["upload-limits.ts", "file-field.ts", "submission-algorithm.ts"]
+    .map((file) => readFileSync(path.join(process.cwd(), "app/lib", file), "utf8"))
+    .join("\n");
   const javascript = ts.transpileModule(source, {
     compilerOptions: {
       module: ts.ModuleKind.ESNext,

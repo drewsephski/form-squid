@@ -62,7 +62,7 @@ export function UseTemplateButton({
   return (
     <AnimateHeight>
       <div className="space-y-2">
-        <Button type="button" className="h-11 rounded-full px-6" onClick={() => void handleUse()} disabled={pending}>
+        <Button type="button" className="h-11 w-full rounded-full px-6 sm:w-auto" onClick={() => void handleUse()} disabled={pending}>
           {pending ? "Creating form" : label}
         </Button>
         {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}

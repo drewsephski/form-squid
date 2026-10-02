@@ -143,6 +143,7 @@
   }
   body {
     @apply bg-background text-foreground;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   }
   html {
     @apply font-sans;
@@ -169,6 +170,44 @@
   }
 }
 
+/* Keep phone and touch controls comfortable without enlarging inert thumbnails. */
+@media (max-width: 639px), (pointer: coarse) {
+  :is([data-slot="button"], [data-slot="input"], [data-slot="select-trigger"], [data-slot="dropdown-menu-trigger"], [data-slot="tabs-trigger"], [data-slot="dialog-close"]):not([inert] *) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  :is([data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"]):not([inert] *) {
+    font-size: 16px;
+  }
+
+  [data-slot="textarea"]:not([inert] *) {
+    min-height: 112px;
+  }
+
+  :is([data-slot="select-item"], [data-slot="dropdown-menu-item"]):not([inert] *) {
+    min-height: 44px;
+  }
+
+  .touch-choice-label:not([inert] *) {
+    min-height: 44px;
+  }
+
+  [data-slot="tabs-list"]:not([inert] *) {
+    height: auto;
+    min-height: 50px;
+    max-width: 100%;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 639px) {
+  :is(input, textarea, button, [tabindex]) {
+    scroll-margin-block: 5rem;
+  }
+
+}
+
 .generate-loader {
   --size: 250px;
   --duration: 2s;
@@ -180,6 +219,12 @@
   height: var(--size);
   aspect-ratio: 1;
   position: relative;
+}
+
+@media (max-width: 639px) {
+  .generate-loader {
+    --size: 180px;
+  }
 }
 
 .generate-loader .box {

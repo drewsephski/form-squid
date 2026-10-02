@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
@@ -25,6 +25,12 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteOrigin),
   title: "FormSquid",
   description: "Prompt once and get a live hosted form, shadcn/ui source, validation, and a submissions inbox.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

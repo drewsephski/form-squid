@@ -175,7 +175,7 @@ export function FormView({ spec, submitUrl, uploadUrl, preview = false, compact 
   } else {
     body = (
       <form
-        className={`${frameClass} rounded-xl ${compact ? "space-y-4 px-4 py-4" : "space-y-6 px-6 py-6"}`}
+        className={`${frameClass} rounded-xl ${compact ? "space-y-4 px-4 py-4" : "space-y-5 px-4 py-5 sm:space-y-6 sm:px-6 sm:py-6"}`}
         style={frameStyle}
         data-formsquid-theme={appearance.theme}
         onSubmit={(event) => {
@@ -198,7 +198,7 @@ export function FormView({ spec, submitUrl, uploadUrl, preview = false, compact 
             </p>
             <h2 className="text-lg font-medium">{step.title}</h2>
             <div className="h-1 overflow-hidden rounded-full bg-muted" aria-hidden="true">
-              <div className="h-full bg-foreground transition-all" style={{ width: `${progress}%` }} />
+              <div className="h-full bg-foreground transition-[width] motion-reduce:transition-none" style={{ width: `${progress}%` }} />
             </div>
           </div>
         ) : (
@@ -262,7 +262,7 @@ function FieldControl({ field, idPrefix = "", value, error, uploadUrl, hosted, o
   const id = `${idPrefix}field-${field.id}`;
   return (
     <div className="grid gap-2" data-field={field.id}>
-      <Label htmlFor={id}>
+      <Label htmlFor={id} className={field.type === "checkbox" ? "touch-choice-label cursor-pointer" : undefined}>
         {field.label}
         {field.required ? <span className="text-destructive"> *</span> : null}
       </Label>
@@ -286,7 +286,7 @@ function FieldControl({ field, idPrefix = "", value, error, uploadUrl, hosted, o
           value={typeof value === "string" ? value : undefined}
           onValueChange={(next) => { if (next) onChange(next); }}
         >
-          <SelectTrigger id={id} aria-invalid={Boolean(error)} aria-required={field.required}>
+          <SelectTrigger id={id} className="w-full" aria-invalid={Boolean(error)} aria-required={field.required}>
             <SelectValue placeholder={field.placeholder ?? "Select"} />
           </SelectTrigger>
           <SelectContent>
@@ -301,9 +301,9 @@ function FieldControl({ field, idPrefix = "", value, error, uploadUrl, hosted, o
       {field.type === "radio" ? (
         <RadioGroup value={typeof value === "string" ? value : undefined} onValueChange={onChange}>
           {field.options?.map((option) => (
-            <div key={option.value} className="flex items-center gap-2">
+            <div key={option.value} className="flex items-center gap-3 sm:gap-2">
               <RadioGroupItem id={`${id}-${option.value}`} value={option.value} />
-              <Label htmlFor={`${id}-${option.value}`}>{option.label}</Label>
+              <Label htmlFor={`${id}-${option.value}`} className="touch-choice-label flex-1 cursor-pointer">{option.label}</Label>
             </div>
           ))}
         </RadioGroup>

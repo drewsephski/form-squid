@@ -36,12 +36,11 @@ export default async function TemplatePage({ params }: { params: Promise<{ slug:
   const seo = templateSeo[template.slug];
 
   return (
-    <main className="mx-auto grid w-full max-w-5xl flex-1 gap-10 px-4 py-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
+    <main className="mx-auto grid w-full min-w-0 max-w-5xl flex-1 gap-8 px-4 py-6 sm:gap-10 sm:py-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
       <SeoPageView page={`/templates/${template.slug}`} templateSlug={template.slug} />
-      <div className="space-y-6">
+      <div className="min-w-0 space-y-6">
         <div className="space-y-2">
-          <p className="text-xs tracking-wide text-muted-foreground uppercase">{template.category}</p>
-          <h1 className="font-heading text-4xl font-medium tracking-tight">{template.name}</h1>
+          <h1 className="font-heading text-3xl font-medium tracking-tight sm:text-4xl">{template.name}</h1>
           <p className="max-w-xl text-muted-foreground">{template.description}</p>
         </div>
         <UseTemplateButton spec={template.spec} page={`/templates/${template.slug}`} templateSlug={template.slug} />
@@ -50,7 +49,7 @@ export default async function TemplatePage({ params }: { params: Promise<{ slug:
             <h2 id="template-preview-heading" className="text-sm font-medium">Try the preview</h2>
             <p className="text-sm text-muted-foreground">Explore the fields and steps. Preview responses are not saved.</p>
           </div>
-          <div className="rounded-xl border bg-muted/30 p-6">
+          <div className="min-w-0 rounded-xl border bg-muted/30 p-2 sm:p-6">
             <FormView spec={template.spec} preview />
           </div>
         </section>

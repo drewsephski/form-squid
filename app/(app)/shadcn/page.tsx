@@ -3,6 +3,7 @@ import Link from "next/link";
 import { pageMetadata } from "@/app/lib/seo";
 import { shadcnPages } from "@/app/lib/shadcn/pages";
 import { SeoPageView } from "@/app/ui/seo-page-view";
+import { McpSetup } from "@/app/ui/mcp-setup";
 
 export const metadata: Metadata = pageMetadata({
   title: "Shadcn Form Examples | FormSquid",
@@ -31,6 +32,10 @@ export default function ShadcnIndexPage() {
           </li>
         ))}
       </ul>
+      <section className="mt-10 min-w-0 space-y-3" aria-labelledby="mcp-setup">
+        <h2 id="mcp-setup" className="text-lg font-medium">Install with MCP</h2>
+        <McpSetup />
+      </section>
     </main>
   );
 }
