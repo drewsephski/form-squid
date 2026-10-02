@@ -15,7 +15,7 @@
 
 # next.js
 /.next/
-/.next-acceptance/
+/.next-*/
 /out/
 
 # production
