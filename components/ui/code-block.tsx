@@ -13,6 +13,8 @@ export type CodeBlockLanguage =
   | "jsx"
   | "sh"
   | "shell"
+  | "text"
+  | "toml"
   | "ts"
   | "tsx";
 
@@ -139,6 +141,8 @@ const RULES_JSON: TokenRule[] = [
 ];
 
 const LANGUAGE_RULES: Record<CodeBlockLanguage, TokenRule[]> = {
+  text: [],
+  toml: RULES_JSON,
   bash: RULES_BASH,
   css: RULES_CSS,
   js: RULES_JS,

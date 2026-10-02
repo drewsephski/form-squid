@@ -114,10 +114,10 @@ export function FormsList({ forms }: { forms: FormSummary[] }) {
           Describe what you need and FormSquid will generate the hosted form and source code.
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-          <Link href="/" className={buttonVariants()}>
+          <Link href="/" data-slot="button" className={buttonVariants()}>
             Generate a form
           </Link>
-          <Link href="/templates" className={buttonVariants({ variant: "outline" })}>
+          <Link href="/templates" data-slot="button" className={buttonVariants({ variant: "outline" })}>
             Browse templates
           </Link>
         </div>
@@ -170,6 +170,7 @@ export function FormsList({ forms }: { forms: FormSummary[] }) {
             <div className="flex shrink-0 flex-wrap items-center gap-2">
               {form.published ? (
                 <a
+                  data-slot="button"
                   href={liveHref(form.slug)}
                   target="_blank"
                   rel="noreferrer"
@@ -178,7 +179,7 @@ export function FormsList({ forms }: { forms: FormSummary[] }) {
                   Open
                 </a>
               ) : null}
-              <Link href={`/forms/${form.id}`} className={buttonVariants({ variant: "outline" })}>
+              <Link href={`/forms/${form.id}`} data-slot="button" className={buttonVariants({ variant: "outline" })}>
                 Edit
               </Link>
               <DropdownMenu>

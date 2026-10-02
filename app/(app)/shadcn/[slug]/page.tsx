@@ -14,6 +14,9 @@ import {
 import { SeoPageView } from "@/app/ui/seo-page-view";
 import { SourceTabs } from "@/app/ui/source-tabs";
 import { UseTemplateButton } from "@/app/ui/use-template-button";
+import { McpSetup } from "@/app/ui/mcp-setup";
+import { CodeBlock } from "@/components/ui/code-block";
+import { appOrigin } from "@/app/lib/origin";
 
 export function generateStaticParams() {
   return shadcnPages.map((page) => ({ slug: page.slug }));
@@ -53,7 +56,7 @@ export default async function ShadcnExamplePage({ params }: { params: Promise<{ 
 
       <section className="space-y-3" aria-labelledby="live-preview">
         <h2 id="live-preview" className="text-sm font-medium">Live preview</h2>
-        <div className="rounded-xl border bg-muted/30 p-6">
+        <div className="min-w-0 rounded-xl border bg-muted/30 p-2 sm:p-6">
           <FormView spec={page.spec} preview />
         </div>
       </section>
@@ -69,6 +72,17 @@ export default async function ShadcnExamplePage({ params }: { params: Promise<{ 
             </Link>
           </p>
         ) : null}
+      </section>
+
+      <section className="min-w-0 space-y-3" aria-labelledby="install">
+        <h2 id="install" className="text-sm font-medium">Install in your Next.js app</h2>
+        <CodeBlock code={`pnpm dlx shadcn@latest add ${appOrigin()}/r/${page.slug}.json`} language="bash" label="Install example command" showLineNumbers={false} />
+        <Accordion>
+          <AccordionItem value="mcp">
+            <AccordionTrigger>Connect with MCP</AccordionTrigger>
+            <AccordionContent><McpSetup itemName={page.slug} /></AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </section>
 
       <section className="space-y-3" aria-labelledby="source">

@@ -27,7 +27,7 @@ function serverDraftSnapshot() {
 
 function GeneratingMark() {
   return (
-    <div className="flex aspect-video w-full flex-col items-center justify-center gap-10" aria-hidden="true">
+    <div className="flex min-h-72 w-full flex-col items-center justify-center gap-6 py-6 sm:min-h-80 sm:gap-10" aria-hidden="true">
       <div className="loader generate-loader">
         <div className="box">
           <div className="logo">
@@ -58,6 +58,7 @@ export function Generator() {
   const [storageError, setStorageError] = useState("");
   const [pending, setPending] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showAllPresets, setShowAllPresets] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
 
   function updatePrompt(value: string) {
@@ -146,7 +147,7 @@ export function Generator() {
   return (
     <div className="mx-auto w-full max-w-xl space-y-4">
       {!spec && storedDraft.spec ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-4">
+        <div className="flex flex-col gap-3 rounded-xl border p-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:rounded-2xl sm:p-4">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium">You have an unfinished form</p>
             <p className="truncate text-sm text-muted-foreground">{storedDraft.spec.title}</p>
@@ -159,23 +160,16 @@ export function Generator() {
       ) : null}
       {storageError ? <p role="status" className="text-sm text-muted-foreground">{storageError}</p> : null}
       <AnimateHeight>
-        <div className="rounded-[2rem] bg-foreground/5 p-1.5">
-          <div className="rounded-[calc(2rem-0.375rem)] bg-card p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+        <div className="rounded-2xl bg-foreground/5 p-1.5 sm:rounded-[2rem]">
+          <div className="flex flex-col rounded-xl bg-card p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] sm:rounded-[calc(2rem-0.375rem)]">
             <Textarea
               aria-label="What form do you need?"
-              className="min-h-36 resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
+              className="min-h-28 resize-none border-0 bg-transparent shadow-none focus-visible:ring-0 sm:min-h-36"
               placeholder="Describe the form you need"
               value={prompt}
               onChange={(event) => updatePrompt(event.target.value)}
               disabled={pending || saving}
             />
-            <div className="flex flex-wrap gap-2 px-1 pt-2">
-              {promptPresets.map((preset) => (
-                <Button key={preset.label} type="button" variant="outline" className="rounded-full" onClick={() => updatePrompt(preset.prompt)} disabled={pending || saving}>
-                  {preset.label}
-                </Button>
-              ))}
-            </div>
             <div className="pt-2">
               <Button
                 type="button"
@@ -184,6 +178,16 @@ export function Generator() {
                 disabled={pending || saving}
               >
                 {pending ? "Generating" : "Generate"}
+              </Button>
+            </div>
+            <div id="prompt-ideas" className="grid grid-cols-2 gap-2 pt-3 sm:flex sm:flex-wrap sm:px-1">
+              {promptPresets.map((preset, index) => (
+                <Button key={preset.label} type="button" variant="outline" className={`rounded-full px-2 text-[13px] sm:px-2.5 sm:text-sm ${index > 2 && !showAllPresets ? "hidden sm:inline-flex" : ""}`} onClick={() => updatePrompt(preset.prompt)} disabled={pending || saving}>
+                  {preset.label}
+                </Button>
+              ))}
+              <Button type="button" variant="ghost" className="rounded-full px-2 text-[13px] sm:hidden" aria-expanded={showAllPresets} aria-controls="prompt-ideas" onClick={() => setShowAllPresets((visible) => !visible)} disabled={pending || saving}>
+                {showAllPresets ? "Fewer ideas" : "More ideas"}
               </Button>
             </div>
           </div>
@@ -201,24 +205,18 @@ export function Generator() {
                 Generating your form
               </p>
             </div>
-          ) : (
-            <div className="rounded-[2rem] bg-foreground/5 p-1.5">
-              <div className="rounded-[calc(2rem-0.375rem)] bg-card p-6">
-                {spec ? (
+          ) : spec ? (
+            <div className="rounded-2xl bg-foreground/5 p-1.5 sm:rounded-[2rem]">
+              <div className="rounded-xl bg-card p-2 sm:rounded-[calc(2rem-0.375rem)] sm:p-6">
                   <div className="animate-in fade-in slide-in-from-bottom-2 space-y-6 duration-500">
                     <FormView spec={spec} preview />
                     <Button type="button" variant="outline" className="h-11 w-full rounded-full" onClick={() => void handleSave()} disabled={saving}>
                       {saving ? "Saving" : "Save & customize"}
                     </Button>
                   </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center text-center text-muted-foreground">
-                    <p>Describe your form above</p>
-                  </div>
-                )}
               </div>
             </div>
-          )}
+          ) : null}
         </AnimateHeight>
       </div>
     </div>

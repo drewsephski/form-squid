@@ -183,15 +183,18 @@ async function installRegistry(origin: string, registryKey: string, consumerDir:
   const installDir = path.join(consumerDir, "components", item.name);
   await mkdir(installDir, { recursive: true });
   for (const file of item.files) {
-    await writeFile(path.join(installDir, file.path), file.content);
+    await writeFile(path.join(installDir, path.basename(file.path)), file.content);
   }
-  const formSource = await readFile(path.join(installDir, "form.tsx"), "utf8");
+  const formFile = item.files.find((file) => file.path.endsWith(".tsx"));
+  if (!formFile) throw new Error("Registry item did not include a form component.");
+  const componentName = path.basename(formFile.path, ".tsx");
+  const formSource = await readFile(path.join(installDir, `${componentName}.tsx`), "utf8");
   if (!formSource.includes(submitUrl)) {
     throw new Error(`Installed form does not submit to ${submitUrl}.`);
   }
   await writeFile(
     path.join(consumerDir, "app", "page.tsx"),
-    `import { ExportedForm } from "@/components/${item.name}/form";
+    `import { ExportedForm } from "@/components/${item.name}/${componentName}";
 
 export default function Page() {
   return (

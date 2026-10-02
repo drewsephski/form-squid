@@ -1,5 +1,7 @@
 "use client";
 
+import { McpSetup } from "@/app/ui/mcp-setup";
+
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -118,6 +120,7 @@ export function Editor({ form }: { form: EditorForm }) {
   const [compiled, setCompiled] = useState<{ schemaSource: string; formSource: string } | null>(null);
   const [previewVersionId, setPreviewVersionId] = useState("");
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
+  const [mobilePane, setMobilePane] = useState<"preview" | "edit">("preview");
   const [lowerTab, setLowerTab] = useState<LaunchTab>("submissions");
   const [webhook, setWebhook] = useState<WebhookPanelState | null>(form.webhook);
   const [highlightNotifyEmail, setHighlightNotifyEmail] = useState(false);
@@ -443,7 +446,7 @@ export function Editor({ form }: { form: EditorForm }) {
   }
 
   return (
-    <div className="grid min-w-0 gap-8">
+    <div className="grid min-w-0 gap-6 sm:gap-8">
       <header className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <Link
           href="/forms"
@@ -465,8 +468,17 @@ export function Editor({ form }: { form: EditorForm }) {
         </p>
       </header>
 
+      <div className="grid grid-cols-2 gap-2 lg:hidden" role="group" aria-label="Editor view">
+        <Button type="button" variant={mobilePane === "preview" ? "default" : "outline"} aria-pressed={mobilePane === "preview"} aria-controls="editor-preview" onClick={() => setMobilePane("preview")}>
+          Preview
+        </Button>
+        <Button type="button" variant={mobilePane === "edit" ? "default" : "outline"} aria-pressed={mobilePane === "edit"} aria-controls="editor-controls" onClick={() => setMobilePane("edit")}>
+          Edit form
+        </Button>
+      </div>
+
       <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="min-w-0 space-y-3">
+        <div id="editor-preview" className={`min-w-0 space-y-3 ${mobilePane === "preview" ? "block" : "hidden"} lg:block`}>
           <div className="flex gap-2" role="group" aria-label="Preview size">
             <Button type="button" variant={previewDevice === "desktop" ? "default" : "outline"} onClick={() => setPreviewDevice("desktop")}>
               Desktop
@@ -477,14 +489,15 @@ export function Editor({ form }: { form: EditorForm }) {
           </div>
           <div className={previewDevice === "mobile" ? "mx-auto w-[390px] max-w-full" : "min-w-0"}>
             <AnimateHeight>
-              <div className="min-w-0 overflow-x-auto rounded-xl border bg-muted/30 p-6">
+              <div className="min-w-0 overflow-x-auto rounded-xl border bg-muted/30 p-2 sm:p-6">
                 <FormView spec={spec} preview />
               </div>
             </AnimateHeight>
           </div>
         </div>
+        <div id="editor-controls" className={`min-w-0 ${mobilePane === "edit" ? "block" : "hidden"} lg:block`}>
         <Tabs defaultValue="ai" className="min-w-0">
-          <TabsList className="flex h-auto flex-wrap">
+          <TabsList className="grid h-auto w-full grid-cols-2 sm:grid-cols-4">
             <TabsTrigger value="ai">AI</TabsTrigger>
             <TabsTrigger value="fields">Fields</TabsTrigger>
             <TabsTrigger value="form">Form</TabsTrigger>
@@ -520,27 +533,28 @@ export function Editor({ form }: { form: EditorForm }) {
             </AnimateHeight>
           </TabsContent>
         </Tabs>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="space-y-1">
+        <div className="min-w-0 space-y-1">
           <p className="text-sm" aria-live="polite">
             {published ? <span className="mr-2 inline-block size-1.5 rounded-full bg-foreground align-middle" aria-hidden="true" /> : null}
             {published ? "Published" : "Draft"}
           </p>
           {published ? (
-            <p className="font-mono text-sm">
+            <p className="break-all font-mono text-sm">
               <span className="text-muted-foreground">Published: </span>
               {hostedHost(publishedSlug)}
             </p>
           ) : null}
           {published && slug !== publishedSlug ? (
-            <p className="font-mono text-sm">
+            <p className="break-all font-mono text-sm">
               <span className="text-muted-foreground">Draft address: </span>
               {hostedHost(slug)}
             </p>
           ) : null}
-          {!published ? <p className="font-mono text-sm">{hostedHost(slug)}</p> : null}
+          {!published ? <p className="break-all font-mono text-sm">{hostedHost(slug)}</p> : null}
           <p className="text-sm text-muted-foreground" aria-live="polite">{status}</p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -583,7 +597,7 @@ export function Editor({ form }: { form: EditorForm }) {
             keepMounted
             className="min-w-0 space-y-4 [&[hidden]]:block [&[hidden]]:invisible [&[hidden]]:pointer-events-none"
           >
-            <form className="flex gap-2" onSubmit={(event) => void handleSaveNotifyEmail(event)}>
+            <form className="flex flex-col gap-2 sm:flex-row" onSubmit={(event) => void handleSaveNotifyEmail(event)}>
               <Input
                 ref={notifyEmailRef}
                 aria-label="Notification email"
@@ -787,6 +801,10 @@ export function Editor({ form }: { form: EditorForm }) {
                     showLineNumbers={false}
                   />
                   {unpublished ? <p className="text-sm text-muted-foreground">The registry contains your last published version. Publish changes to update it.</p> : null}
+                  <details className="rounded-xl border px-4 py-3">
+                    <summary className="cursor-pointer text-sm font-medium focus-visible:outline-2 focus-visible:outline-ring">Connect with MCP</summary>
+                    <div className="mt-4"><McpSetup registryKey={form.registryKey} itemName="published-form" /></div>
+                  </details>
                 </>
               ) : (
                 <p className="text-sm text-muted-foreground">Publish this form to get a shadcn registry install command.</p>

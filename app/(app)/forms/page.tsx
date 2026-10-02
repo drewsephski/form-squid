@@ -14,12 +14,12 @@ export default async function FormsPage() {
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-8">
-      <div className="mb-8 flex items-end justify-between gap-4">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4 sm:mb-8">
         <div className="space-y-1">
-          <h1 className="font-heading text-4xl font-medium tracking-tight">My forms</h1>
+          <h1 className="font-heading text-3xl font-medium tracking-tight sm:text-4xl">My forms</h1>
           <p className="text-muted-foreground">Drafts and published forms.</p>
         </div>
-        <Link href="/" className={buttonVariants()}>
+        <Link href="/" data-slot="button" className={buttonVariants()}>
           New form
         </Link>
       </div>

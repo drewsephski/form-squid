@@ -11,6 +11,7 @@
     "test": "jest",
     "test:acceptance": "node --experimental-strip-types scripts/acceptance.ts",
     "test:acceptance:function": "node --experimental-strip-types scripts/acceptance.ts --function",
+    "test:acceptance:mcp": "node --experimental-strip-types scripts/shadcn-mcp-acceptance.ts",
     "test:acceptance:uploads": "node --experimental-strip-types scripts/upload-acceptance.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
@@ -52,6 +53,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.31.0",
     "@tailwindcss/postcss": "^4",
     "@types/jest": "^30.0.0",
     "@types/node": "^20",
